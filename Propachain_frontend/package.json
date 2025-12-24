@@ -10,12 +10,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@aptos-labs/ts-sdk": "^5.2.0",
+    "@aptos-labs/wallet-adapter-react": "^7.2.7",
+    "@aptos-labs/wallet-standard": "^0.5.2",
+    "@privy-io/react-auth": "^3.9.1",
     "@tailwindcss/vite": "^4.1.18",
+    "@tanstack/react-query": "^5.90.5",
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.561.0",
+    "pinata": "^2.5.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-hot-toast": "^2.6.0",
+    "react-icons": "^5.5.0",
+    "react-jazzicon": "^1.0.4",
     "react-router-dom": "^7.10.1",
     "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.18"

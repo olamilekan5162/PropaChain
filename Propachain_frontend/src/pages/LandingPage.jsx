@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { Button } from '../components/common/Button';
 import { PropertyCard } from '../components/common/PropertyCard';
 import { Footer } from '../components/layout/Footer';
+import { useState } from 'react';
+import WalletModal from '../components/wallet/WalletModal';
+import { useMovementWallet } from '../hooks/useMovementWallet';
 
 // Mock Data
 const FEATURED_PROPERTIES = [
@@ -42,6 +45,9 @@ const FEATURED_PROPERTIES = [
 ];
 
 export default function LandingPage() {
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const { walletAddress } = useMovementWallet();
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Hero Section */}
@@ -77,11 +83,26 @@ export default function LandingPage() {
                 Explore Marketplace <ArrowRight className="ml-2" />
               </Button>
             </Link>
-            <Link to="/app">
-               <Button variant="secondary" size="lg" className="w-full sm:w-auto text-lg border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:border-slate-600">
+            {!walletAddress ? (
+              <Button 
+                variant="secondary" 
+                size="lg" 
+                className="w-full sm:w-auto text-lg border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:border-slate-600"
+                onClick={() => setShowWalletModal(true)}
+              >
                 Connect Wallet
               </Button>
-            </Link>
+            ) : (
+              <Link to="/app">
+                <Button 
+                  variant="secondary" 
+                  size="lg" 
+                  className="w-full sm:w-auto text-lg border-emerald-500/50 bg-emerald-900/20 text-emerald-400 hover:bg-emerald-900/30"
+                >
+                  Go to Dashboard
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </section>
@@ -137,6 +158,11 @@ export default function LandingPage() {
       </section>
 
       <Footer />
+      
+      <WalletModal 
+        isOpen={showWalletModal} 
+        onClose={() => setShowWalletModal(false)} 
+      />
     </div>
   );
 }
