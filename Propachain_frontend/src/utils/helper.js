@@ -1,60 +1,55 @@
 import { PinataSDK } from "pinata";
-import { toast } from "react-hot-toast";
+import toast from "react-hot-toast";
+
+export const trimAddress = (address) => {
+  if (!address) return "";
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+};
+
+export const formatDate = (dateString) => {
+  const options = { year: "numeric", month: "long", day: "numeric" };
+  return new Date(dateString).toLocaleDateString(undefined, options);
+};
 
 const pinata = new PinataSDK({
-    pinataJwt: import.meta.env.VITE_PINATA_JWT,
-    pinataGateway: import.meta.env.VITE_GATEWAY_URL,
+  pinataJwt: import.meta.env.VITE_PINATA_JWT,
+  pinataGateway: import.meta.env.VITE_PINATA_GATEWAY,
 });
 
 export const uploadImageVideoFile = async (
-    e,
-    image,
-    video,
-    document,
-    toastId
+  e,
+  imageFile,
+  videoFile,
+  documentFile = ""
 ) => {
-    e.preventDefault();
+  e.preventDefault();
+  let documentCid = null;
+  try {
+    const ImageUpload = await pinata.upload.public.file(imageFile);
+    const imageCid = ImageUpload.cid;
 
-    try {
-        if (!image) {
-            toast.error("Please upload an image.", { id: toastId });
-            return null;
-        }
+    const videoUpload = await pinata.upload.public.file(videoFile);
+    const videoCid = videoUpload.cid;
 
-        const uploadPromises = [];
-
-        // Upload Image
-        uploadPromises.push(
-            pinata.upload.file(image).then((res) => ({ type: "image", cid: res.cid }))
-        );
-
-        // Upload Video if exists
-        if (video) {
-            uploadPromises.push(
-                pinata.upload.file(video).then((res) => ({ type: "video", cid: res.cid }))
-            );
-        }
-
-        // Upload Document if exists
-        if (document) {
-            uploadPromises.push(
-                pinata.upload.file(document).then((res) => ({ type: "document", cid: res.cid }))
-            );
-        }
-
-        const results = await Promise.all(uploadPromises);
-        
-        // Construct return object
-        const cids = {};
-        results.forEach(res => {
-            cids[res.type] = res.cid;
-        });
-
-        return cids;
-
-    } catch (error) {
-        console.error("Upload failed:", error);
-        toast.error("Failed to upload files to IPFS.", { id: toastId });
-        return null;
+    if (documentFile) {
+      const documentUpload = await pinata.upload.public.file(documentFile);
+      documentCid = documentUpload.cid;
     }
+
+    console.log("files uploaded successfully");
+    toast.success("files uploaded successfully, creating transaction", {
+      duration: 5000,
+    });
+
+    return {
+      imageCid: imageCid,
+      videoCid: videoCid,
+      documentCid: documentCid,
+    };
+  } catch (e) {
+    console.error(e);
+    toast.error("failed to upload files", {
+      duration: 5000,
+    });
+  }
 };

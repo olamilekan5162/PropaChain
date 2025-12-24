@@ -84,7 +84,7 @@ export default function DashboardLayout() {
         <div className="p-6 border-b border-slate-100">
           <Link to="/">
             <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              PropATradeX
+              PropaChain
             </h1>
           </Link>
         </div>
