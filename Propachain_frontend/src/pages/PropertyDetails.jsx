@@ -1,19 +1,87 @@
 import { useParams } from 'react-router-dom';
-import { MapPin, Bed, Bath, Square, Share2, Heart, FileText, ShieldCheck, Clock } from 'lucide-react';
+import { MapPin, Bed, Bath, Square, Share2, Heart, FileText, ShieldCheck, Clock, Loader2 } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { CountdownTimer } from '../components/common/CountdownTimer';
 import { PurchaseModal } from '../components/features/PurchaseModal';
-import { PROPERTIES_DATA } from '../utils/mockData';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useFetchProperties } from '../hooks/useFetchProperties';
+
+const GATEWAY_URL = import.meta.env.VITE_PINATA_GATEWAY;
 
 export default function PropertyDetails() {
   const { id } = useParams();
-  const property = PROPERTIES_DATA[1]; // Mocking using ID 1 for now as we don't have full data store
+  const { fetchPropertyById } = useFetchProperties();
+  const [property, setProperty] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [activeImage, setActiveImage] = useState(0);
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
 
-  if (!property) return <div>Property not found</div>;
+  useEffect(() => {
+    const loadProperty = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchPropertyById(id);
+        if (data) {
+          // Verify if data.images exists and is an array, otherwise fallback
+          // Assuming the contract returns CIDs in 'images' field which might be a vector<string>
+          const images = data.images_cids && data.images_cids.length > 0 
+            ? data.images_cids.map(cid => `https://${GATEWAY_URL}/ipfs/${cid}`)
+            : ["https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800"]; // Fallback
+
+          // Transform blockchain data to UI format
+          const formattedProperty = {
+            id: id,
+            title: data.description ? data.description.substring(0, 50) + (data.description.length > 50 ? "..." : "") : "Property #" + id,
+            description: data.description || "No description available.",
+            location: data.property_address || "Unknown Location",
+            price: parseInt(data.price || 0) / 100_000_000, 
+            rentPrice: parseInt(data.monthly_rent || 0) / 100_000_000,
+            images: images,
+            beds: 3, // Placeholder as contract might not have this detailed breakdown easily accessible or packed in description
+            baths: 2, // Placeholder
+            sqft: 2200, // Placeholder
+            status: data.listing_type === 1 ? "Available" : "For Rent", // 1 = Sale, 2 = Rent
+            features: ["Modern Design", "Smart Home", "Energy Efficient"], // Placeholder
+            documents: data.documents ? data.documents.map((doc, i) => ({ name: `Document ${i+1}`, size: 'Unknown', cid: doc })) : [],
+            listingType: data.listing_type
+          };
+          setProperty(formattedProperty);
+        } else {
+          setError("Property not found on chain.");
+        }
+      } catch (err) {
+        console.error("Error loading property:", err);
+        setError("Failed to load property details.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      loadProperty();
+    }
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
+        <p className="text-slate-500">Loading property details...</p>
+      </div>
+    );
+  }
+
+  if (error || !property) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Property Not Found</h2>
+        <p className="text-slate-500 mb-6">{error || "The property you are looking for does not exist."}</p>
+        <Button onClick={() => window.history.back()}>Go Back</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -37,24 +105,32 @@ export default function PropertyDetails() {
         <div className="lg:col-span-2 space-y-8">
           {/* Gallery */}
           <div className="space-y-4">
-            <div className="aspect-video w-full rounded-2xl overflow-hidden shadow-sm">
+            <div className="aspect-video w-full rounded-2xl overflow-hidden shadow-sm bg-slate-100">
               <img 
                 src={property.images[activeImage]} 
                 alt={property.title} 
                 className="w-full h-full object-cover"
+                onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800"; }}
               />
             </div>
-            <div className="grid grid-cols-3 gap-4">
-              {property.images.map((img, idx) => (
-                <button 
-                  key={idx}
-                  onClick={() => setActiveImage(idx)}
-                  className={`aspect-video rounded-xl overflow-hidden border-2 transition-all ${activeImage === idx ? 'border-primary ring-2 ring-primary/20' : 'border-transparent opacity-70 hover:opacity-100'}`}
-                >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
-            </div>
+            {property.images.length > 1 && (
+              <div className="grid grid-cols-3 gap-4">
+                {property.images.map((img, idx) => (
+                  <button 
+                    key={idx}
+                    onClick={() => setActiveImage(idx)}
+                    className={`aspect-video rounded-xl overflow-hidden border-2 transition-all ${activeImage === idx ? 'border-primary ring-2 ring-primary/20' : 'border-transparent opacity-70 hover:opacity-100'}`}
+                  >
+                    <img 
+                      src={img} 
+                      alt="" 
+                      className="w-full h-full object-cover" 
+                      onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800"; }}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Key Features */}
@@ -84,7 +160,7 @@ export default function PropertyDetails() {
                </div>
             </div>
             <h4 className="font-medium text-slate-900 mb-2">Description</h4>
-            <p className="text-slate-600 leading-relaxed mb-6">
+            <p className="text-slate-600 leading-relaxed mb-6 whitespace-pre-wrap">
               {property.description}
             </p>
             
@@ -99,25 +175,33 @@ export default function PropertyDetails() {
           </div>
 
           {/* Documents */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Property Documents (IPFS)</h3>
-            <div className="space-y-3">
-              {property.documents.map((doc, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 group cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
-                      <FileText size={20} />
+          {property.documents.length > 0 && (
+            <div className="bg-white p-6 rounded-2xl border border-slate-200">
+              <h3 className="text-lg font-bold text-slate-900 mb-4">Property Documents (IPFS)</h3>
+              <div className="space-y-3">
+                {property.documents.map((doc, i) => (
+                  <a 
+                    key={i} 
+                    href={`${GATEWAY_URL}${doc.cid}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 group cursor-pointer text-decoration-none"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
+                        <FileText size={20} />
+                      </div>
+                      <div>
+                        <p className="font-medium text-slate-700">{doc.name}</p>
+                        <p className="text-xs text-slate-400">{doc.size}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-slate-700">{doc.name}</p>
-                      <p className="text-xs text-slate-400">{doc.size}</p>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="sm">View</Button>
-                </div>
-              ))}
+                    <Button variant="ghost" size="sm">View</Button>
+                  </a>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Right Column - Action Panel */}
@@ -129,23 +213,28 @@ export default function PropertyDetails() {
             </div>
 
             <div className="mb-8">
-              <p className="text-sm text-slate-500 mb-1">Buy Price</p>
+              <p className="text-sm text-slate-500 mb-1">{property.listingType === 2 ? 'Monthly Rent' : 'Buy Price'}</p>
               <div className="flex items-end gap-2">
-                <span className="text-3xl font-bold text-primary">${property.price.toLocaleString()}</span>
+                <span className="text-3xl font-bold text-primary">
+                  {property.listingType === 2 ? property.rentPrice.toLocaleString() : property.price.toLocaleString()}
+                </span>
                 <span className="text-sm font-medium text-slate-400 mb-1">MOVE</span>
               </div>
             </div>
 
             <div className="space-y-3 mb-6">
-              <Button 
-                className="w-full text-lg h-12"
-                onClick={() => setIsPurchaseModalOpen(true)}
-              >
-                Buy Property Now
-              </Button>
-              <Button variant="secondary" className="w-full text-lg h-12">
-                Rent for ${property.rentPrice}/mo
-              </Button>
+              {property.listingType === 1 ? (
+                 <Button 
+                   className="w-full text-lg h-12"
+                   onClick={() => setIsPurchaseModalOpen(true)}
+                 >
+                   Buy Property Now
+                 </Button>
+              ) : (
+                <Button variant="secondary" className="w-full text-lg h-12">
+                   Rent for {property.rentPrice} MOVE/mo
+                </Button>
+              )}
             </div>
 
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
@@ -161,12 +250,14 @@ export default function PropertyDetails() {
             </div>
 
              {/* Example Countdown for Rental (Hidden if not relevant, showing for demo) */}
-             <div className="mt-6 pt-6 border-t border-slate-100">
-                <div className="flex items-center gap-2 mb-3 text-slate-900 font-medium">
-                  <Clock size={16} /> Auction / Rental Ends
-                </div>
-                <CountdownTimer targetDate={new Date(Date.now() + 86400000 * 3)} className="justify-between" />
-             </div>
+             {property.listingType === 2 && (
+               <div className="mt-6 pt-6 border-t border-slate-100">
+                  <div className="flex items-center gap-2 mb-3 text-slate-900 font-medium">
+                    <Clock size={16} /> Auction / Rental Ends
+                  </div>
+                  <CountdownTimer targetDate={new Date(Date.now() + 86400000 * 3)} className="justify-between" />
+               </div>
+             )}
           </div>
         </div>
       </div>

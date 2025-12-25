@@ -2,17 +2,20 @@ import { useState, useEffect } from 'react';
 import { X, ShieldCheck, CheckCircle, ArrowRight, Loader2, FileText, Download } from 'lucide-react';
 import { Button } from '../common/Button';
 import { motion, AnimatePresence } from 'framer-motion';
+import { usePropertyOperations } from '../../hooks/usePropertyOperations';
+import { useMovementWallet } from '../../hooks/useMovementWallet';
+import { toast } from 'react-hot-toast';
 
 const STEPS = {
   REVIEW: 0,
-  ESCROW: 1,
-  PAYMENT: 2,
-  SUCCESS: 3
+  SUCCESS: 1
 };
 
 export const PurchaseModal = ({ isOpen, onClose, property }) => {
   const [step, setStep] = useState(STEPS.REVIEW);
   const [isProcessing, setIsProcessing] = useState(false);
+  const { depositToEscrow } = usePropertyOperations();
+  const { walletAddress } = useMovementWallet();
 
   // Reset state when opening
   useEffect(() => {
@@ -23,24 +26,28 @@ export const PurchaseModal = ({ isOpen, onClose, property }) => {
   }, [isOpen]);
 
   const handleCreateEscrow = async () => {
-    setIsProcessing(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsProcessing(false);
-      setStep(STEPS.ESCROW);
-    }, 1500);
-  };
+    if (!walletAddress) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
 
-  const handleConfirmPayment = async () => {
     setIsProcessing(true);
-    // Simulate Blockchain Transaction
-    setTimeout(() => {
-      setStep(STEPS.PAYMENT);
-      setTimeout(() => {
-        setIsProcessing(false);
+    try {
+      const toastId = toast.loading("Processing your purchase...");
+      // property.price is displayed in MOVE (formatted), we need octas
+      const rawPrice = Math.round(property.price * 100_000_000); 
+      
+      const success = await depositToEscrow(toastId, property.id, rawPrice);
+      
+      if (success) {
         setStep(STEPS.SUCCESS);
-      }, 2000);
-    }, 1000);
+      }
+    } catch (error) {
+      console.error("Failed to purchase property:", error);
+      toast.error("Failed to purchase property");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -67,7 +74,7 @@ export const PurchaseModal = ({ isOpen, onClose, property }) => {
         <div className="p-6">
           {/* Progress Bar */}
           <div className="flex gap-2 mb-8">
-            {[0, 1, 2, 3].map((s) => (
+            {[0, 1].map((s) => (
               <div 
                 key={s} 
                 className={`h-1 flex-1 rounded-full transition-colors duration-300 ${s <= step ? 'bg-primary' : 'bg-slate-100'}`} 
@@ -85,31 +92,44 @@ export const PurchaseModal = ({ isOpen, onClose, property }) => {
                 className="space-y-4"
               >
                 <div className="flex gap-4 p-4 bg-slate-50 rounded-xl">
-                  <img src={property.images[0]} alt="" className="w-20 h-20 object-cover rounded-lg" />
+                  <img 
+                    src={property.images[0]} 
+                    alt="" 
+                    className="w-20 h-20 object-cover rounded-lg"
+                    onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800"; }}
+                  />
                   <div>
                     <h3 className="font-bold text-slate-900">{property.title}</h3>
-                    <p className="text-sm text-slate-500">{property.location}</p>
-                    <p className="text-primary font-bold mt-1">${property.price.toLocaleString()} MOVE</p>
+                    <p className="text-sm text-slate-500 truncate max-w-[200px]">{property.location}</p>
+                    <p className="text-primary font-bold mt-1">{property.price.toLocaleString()} MOVE</p>
                   </div>
                 </div>
 
                 <div className="space-y-2 text-sm text-slate-600">
                   <div className="flex justify-between">
                     <span>Property Price</span>
-                    <span>${property.price.toLocaleString()}</span>
+                    <span>{property.price.toLocaleString()} MOVE</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Platform Fee (0%)</span>
                     <span className="text-emerald-500">FREE</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Network Fee (MOVE)</span>
-                    <span>~ $0.00</span>
+                    <span>Network Fee</span>
+                    <span>~ 0.001 MOVE</span>
                   </div>
                   <div className="pt-2 border-t border-slate-100 flex justify-between font-bold text-slate-900 text-base">
                     <span>Total</span>
-                    <span>${property.price.toLocaleString()}</span>
+                    <span>{property.price.toLocaleString()} MOVE</span>
                   </div>
+                </div>
+
+                <div className="p-3 bg-blue-50 text-blue-700 text-xs rounded-lg">
+                  <p className="font-semibold mb-1">Escrow Process:</p>
+                  <ul className="list-disc pl-4 space-y-1">
+                     <li>Funds will be locked in a secure smart contract.</li>
+                     <li>Ownership NFT is minted only upon successful transfer.</li>
+                  </ul>
                 </div>
 
                 <Button 
@@ -117,47 +137,8 @@ export const PurchaseModal = ({ isOpen, onClose, property }) => {
                   onClick={handleCreateEscrow}
                   isLoading={isProcessing}
                 >
-                  Create Escrow Contract
+                  Confirm Purchase
                 </Button>
-              </motion.div>
-            )}
-
-            {step === STEPS.ESCROW && (
-              <motion.div 
-                key="escrow"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="text-center py-6"
-              >
-                <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <ShieldCheck size={32} />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">Escrow Contract Created</h3>
-                <p className="text-slate-500 mb-8 max-w-xs mx-auto">
-                  Smart contract deployed at <span className="font-mono bg-slate-100 px-1 rounded">0x3f...e2a</span>. 
-                  Waiting for your confirmation to proceed.
-                </p>
-                <Button 
-                  className="w-full" 
-                  onClick={handleConfirmPayment}
-                >
-                  Sign & Pay <ArrowRight className="ml-2" size={16} />
-                </Button>
-              </motion.div>
-            )}
-            
-            {(step === STEPS.PAYMENT) && (
-              <motion.div 
-                key="payment"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="text-center py-8"
-              >
-                 <Loader2 size={48} className="animate-spin text-primary mx-auto mb-4" />
-                 <h3 className="text-lg font-bold text-slate-900">Processing Transaction</h3>
-                 <p className="text-slate-500 text-sm">Validating on Movement Network...</p>
               </motion.div>
             )}
 
@@ -180,7 +161,7 @@ export const PurchaseModal = ({ isOpen, onClose, property }) => {
                     <span className="font-semibold text-slate-700">Receipt NFT Minted</span>
                   </div>
                   <p className="text-xs text-slate-500 pl-8">
-                    An NFT representing your ownership receipt has been minted to your wallet.
+                    An NFT representing your ownership has been transferred to your wallet.
                   </p>
                 </div>
 
@@ -188,8 +169,8 @@ export const PurchaseModal = ({ isOpen, onClose, property }) => {
                    <Button variant="secondary" className="w-full">
                      <Download size={16} className="mr-2" /> Download Deed
                    </Button>
-                   <Button className="w-full" onClick={onClose}>
-                     Go to Dashboard
+                   <Button className="w-full" onClick={() => window.location.reload()}>
+                     Return to Property
                    </Button>
                 </div>
               </motion.div>
@@ -198,7 +179,6 @@ export const PurchaseModal = ({ isOpen, onClose, property }) => {
           </AnimatePresence>
         </div>
       </motion.div>
-      
     </div>
   );
 };
