@@ -36,6 +36,7 @@ export default function MyProperties() {
     if (walletAddress) {
       loadMyProperties();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletAddress]);
 
   const loadMyProperties = async () => {
@@ -50,10 +51,7 @@ export default function MyProperties() {
         available: owned.filter((p) => p.status === 1).length,
         inEscrow: owned.filter((p) => p.status === 2).length,
         sold: owned.filter((p) => p.status === 3).length,
-        totalValue: owned.reduce(
-          (sum, p) => sum + parseInt(p.price || 0) / 100_000_000,
-          0
-        ),
+        totalValue: owned.reduce((sum, p) => sum + (p.price || 0), 0),
       };
       setStats(stats);
     } catch (error) {
@@ -67,13 +65,13 @@ export default function MyProperties() {
   if (!walletAddress) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mb-6">
-          <Building2 size={40} className="text-blue-600" />
+        <div className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center mb-6">
+          <Building2 size={40} className="text-teal-700" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">
+        <h2 className="text-2xl font-semibold text-zinc-900 mb-2">
           Connect Your Wallet
         </h2>
-        <p className="text-slate-500">
+        <p className="text-zinc-600">
           Please connect your wallet to view your properties
         </p>
       </div>
@@ -85,65 +83,65 @@ export default function MyProperties() {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">
+          <h1 className="text-3xl font-semibold text-zinc-900 mb-2">
             My Properties
           </h1>
-          <p className="text-slate-600">
+          <p className="text-zinc-600">
             Manage and monitor your property listings
           </p>
         </div>
-        <Button
-          onClick={() => navigate("/app/upload")}
-          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-        >
+        <Button onClick={() => navigate("/app/upload")}>
           <Plus size={20} className="mr-2" />
           List New Property
         </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-              <Building2 size={24} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-lg p-5 border border-zinc-200">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center">
+              <Building2 size={20} className="text-teal-700" />
             </div>
-            <TrendingUp size={20} className="opacity-70" />
           </div>
-          <p className="text-blue-100 text-sm mb-1">Total Properties</p>
-          <p className="text-3xl font-bold">{stats.total}</p>
+          <p className="text-sm text-zinc-600 mb-1">Total Properties</p>
+          <p className="text-2xl font-semibold text-zinc-900">{stats.total}</p>
         </div>
 
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-              <Home size={24} />
+        <div className="bg-white rounded-lg p-5 border border-zinc-200">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center">
+              <Home size={20} className="text-emerald-700" />
             </div>
           </div>
-          <p className="text-green-100 text-sm mb-1">Available</p>
-          <p className="text-3xl font-bold">{stats.available}</p>
+          <p className="text-sm text-zinc-600 mb-1">Available</p>
+          <p className="text-2xl font-semibold text-zinc-900">
+            {stats.available}
+          </p>
         </div>
 
-        <div className="bg-gradient-to-br from-yellow-500 to-orange-500 rounded-2xl p-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-              <Users size={24} />
+        <div className="bg-white rounded-lg p-5 border border-zinc-200">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center">
+              <Users size={20} className="text-amber-700" />
             </div>
           </div>
-          <p className="text-yellow-100 text-sm mb-1">In Escrow</p>
-          <p className="text-3xl font-bold">{stats.inEscrow}</p>
+          <p className="text-sm text-zinc-600 mb-1">In Escrow</p>
+          <p className="text-2xl font-semibold text-zinc-900">
+            {stats.inEscrow}
+          </p>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl p-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-              <DollarSign size={24} />
+        <div className="bg-white rounded-lg p-5 border border-zinc-200">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center">
+              <DollarSign size={20} className="text-teal-700" />
             </div>
           </div>
-          <p className="text-purple-100 text-sm mb-1">Total Value</p>
-          <p className="text-3xl font-bold">
-            {stats.totalValue.toFixed(2)}
-            <span className="text-lg font-normal ml-1">MOVE</span>
+          <p className="text-sm text-zinc-600 mb-1">Total Value</p>
+          <p className="text-2xl font-semibold text-zinc-900">
+            ${stats.totalValue.toFixed(0)}
+            <span className="text-sm font-normal text-zinc-500 ml-1">MOVE</span>
           </p>
         </div>
       </div>
@@ -151,17 +149,17 @@ export default function MyProperties() {
       {/* Properties Grid */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-12 w-12 text-blue-600 animate-spin" />
+          <Loader2 className="h-12 w-12 text-teal-700 animate-spin" />
         </div>
       ) : properties.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-3xl border border-slate-200">
-          <div className="w-20 h-20 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Building2 size={40} className="text-slate-400" />
+        <div className="text-center py-20 bg-white rounded-lg border border-zinc-200">
+          <div className="w-20 h-20 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Building2 size={40} className="text-zinc-400" />
           </div>
-          <h3 className="text-xl font-bold text-slate-900 mb-2">
+          <h3 className="text-xl font-semibold text-zinc-900 mb-2">
             No Properties Listed
           </h3>
-          <p className="text-slate-500 mb-6">
+          <p className="text-zinc-600 mb-6">
             Start earning by listing your first property
           </p>
           <Button onClick={() => navigate("/app/upload")}>

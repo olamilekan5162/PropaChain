@@ -29,10 +29,18 @@ export const RegistrationGuard = ({ children }) => {
   // Show loading while checking registration
   if (isConnected && checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-slate-600 font-medium">Checking your profile...</p>
+          <div className="w-16 h-16 bg-teal-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+            <Loader2
+              className="h-8 w-8 text-teal-700 animate-spin"
+              strokeWidth={2.5}
+            />
+          </div>
+          <p className="text-zinc-900 font-semibold text-lg">
+            Checking your profile...
+          </p>
+          <p className="text-zinc-600 text-sm mt-1">Please wait a moment</p>
         </div>
       </div>
     );

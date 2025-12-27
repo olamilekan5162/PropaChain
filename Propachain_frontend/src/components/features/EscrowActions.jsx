@@ -11,6 +11,7 @@ import {
 import { Button } from "../common/Button";
 import { usePropertyOperations } from "../../hooks/usePropertyOperations";
 import { useMovementWallet } from "../../hooks/useMovementWallet";
+import { addressesEqual } from "../../utils/helper";
 import toast from "react-hot-toast";
 
 export const EscrowActions = ({ property, escrowId, onStatusChange }) => {
@@ -38,6 +39,7 @@ export const EscrowActions = ({ property, escrowId, onStatusChange }) => {
 
   useEffect(() => {
     loadEscrowStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [escrowId]);
 
   const loadEscrowStatus = async () => {
@@ -98,7 +100,7 @@ export const EscrowActions = ({ property, escrowId, onStatusChange }) => {
 
   if (loading) {
     return (
-      <div className="bg-white p-6 rounded-2xl border border-slate-200">
+      <div className="bg-white p-6 rounded-xl border border-zinc-200">
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-8 w-8 text-primary animate-spin" />
         </div>
@@ -110,140 +112,157 @@ export const EscrowActions = ({ property, escrowId, onStatusChange }) => {
     return null;
   }
 
-  const isBuyer =
-    walletAddress?.toLowerCase() === escrowDetails.buyer_renter?.toLowerCase();
-  const isSeller =
-    walletAddress?.toLowerCase() ===
-    escrowDetails.seller_landlord?.toLowerCase();
+  const isBuyer = addressesEqual(walletAddress, escrowDetails.buyer_renter);
+  const isSeller = addressesEqual(walletAddress, escrowDetails.seller_landlord);
 
   const bothConfirmed =
     confirmationStatus.buyerConfirmed && confirmationStatus.sellerConfirmed;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <div className="bg-white rounded-lg border border-zinc-200 shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="p-6 border-b border-slate-100">
+      <div className="bg-gradient-to-r from-teal-50 to-teal-50/50 px-6 py-5 border-b border-teal-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <Shield className="text-blue-600" size={20} />
+            <div className="w-11 h-11 bg-teal-700 rounded-lg flex items-center justify-center">
+              <Shield className="text-white" size={22} />
             </div>
             <div>
-              <h3 className="font-bold text-slate-900">Escrow Status</h3>
-              <p className="text-sm text-slate-500">ID: #{escrowId}</p>
+              <h3 className="font-semibold text-zinc-900 text-lg">
+                Escrow Protection
+              </h3>
+              <p className="text-sm text-zinc-600">Transaction #{escrowId}</p>
             </div>
           </div>
 
           {isDisputed && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-800 rounded-full text-sm font-medium">
-              <AlertTriangle size={14} />
+            <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-semibold">
+              <AlertTriangle size={16} />
               Disputed
             </span>
           )}
 
           {bothConfirmed && !isDisputed && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-              <CheckCircle size={14} />
+            <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-semibold">
+              <CheckCircle size={16} />
               Completed
             </span>
           )}
 
           {!bothConfirmed && !isDisputed && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
-              <Clock size={14} />
-              Pending
+            <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-100 text-amber-700 rounded-lg text-sm font-semibold">
+              <Clock size={16} />
+              In Progress
             </span>
           )}
         </div>
       </div>
 
       {/* Confirmation Status */}
-      <div className="p-6 space-y-4">
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                  confirmationStatus.buyerConfirmed
-                    ? "bg-green-100 text-green-600"
-                    : "bg-slate-200 text-slate-400"
-                }`}
-              >
-                {confirmationStatus.buyerConfirmed ? (
-                  <CheckCircle size={16} />
-                ) : (
-                  <Clock size={16} />
-                )}
+      <div className="p-6">
+        <div className="space-y-3 mb-6">
+          {/* Buyer/Renter Confirmation */}
+          <div className="group relative overflow-hidden bg-zinc-50 hover:bg-zinc-100 transition-colors rounded-lg border border-zinc-200">
+            <div className="flex items-center justify-between p-5">
+              <div className="flex items-center gap-4">
+                <div
+                  className={`w-12 h-12 rounded-lg flex items-center justify-center transition-all ${
+                    confirmationStatus.buyerConfirmed
+                      ? "bg-teal-700 text-white shadow-lg shadow-teal-700/30"
+                      : "bg-zinc-200 text-zinc-500"
+                  }`}
+                >
+                  {confirmationStatus.buyerConfirmed ? (
+                    <CheckCircle size={22} strokeWidth={2.5} />
+                  ) : (
+                    <Clock size={22} />
+                  )}
+                </div>
+                <div>
+                  <p className="font-semibold text-zinc-900 text-base">
+                    {property?.listingType === 1 ? "Buyer" : "Renter"}{" "}
+                    Confirmation
+                  </p>
+                  <p className="text-sm text-zinc-600 mt-0.5">
+                    {confirmationStatus.buyerConfirmed
+                      ? "Confirmed successfully"
+                      : "Awaiting confirmation"}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-slate-900">
-                  {property?.listingType === 1 ? "Buyer" : "Renter"}{" "}
-                  Confirmation
-                </p>
-                <p className="text-xs text-slate-500">
-                  {confirmationStatus.buyerConfirmed
-                    ? "Confirmed"
-                    : "Awaiting confirmation"}
-                </p>
-              </div>
+              {isBuyer && !confirmationStatus.buyerConfirmed && !isDisputed && (
+                <Button
+                  size="sm"
+                  onClick={handleBuyerConfirm}
+                  className="bg-teal-700 hover:bg-teal-800"
+                >
+                  <CheckCircle size={16} className="mr-1.5" />
+                  Confirm
+                </Button>
+              )}
             </div>
-            {isBuyer && !confirmationStatus.buyerConfirmed && !isDisputed && (
-              <Button size="sm" onClick={handleBuyerConfirm}>
-                Confirm
-              </Button>
-            )}
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                  confirmationStatus.sellerConfirmed
-                    ? "bg-green-100 text-green-600"
-                    : "bg-slate-200 text-slate-400"
-                }`}
-              >
-                {confirmationStatus.sellerConfirmed ? (
-                  <CheckCircle size={16} />
-                ) : (
-                  <Clock size={16} />
+          {/* Seller/Landlord Confirmation */}
+          <div className="group relative overflow-hidden bg-zinc-50 hover:bg-zinc-100 transition-colors rounded-lg border border-zinc-200">
+            <div className="flex items-center justify-between p-5">
+              <div className="flex items-center gap-4">
+                <div
+                  className={`w-12 h-12 rounded-lg flex items-center justify-center transition-all ${
+                    confirmationStatus.sellerConfirmed
+                      ? "bg-teal-700 text-white shadow-lg shadow-teal-700/30"
+                      : "bg-zinc-200 text-zinc-500"
+                  }`}
+                >
+                  {confirmationStatus.sellerConfirmed ? (
+                    <CheckCircle size={22} strokeWidth={2.5} />
+                  ) : (
+                    <Clock size={22} />
+                  )}
+                </div>
+                <div>
+                  <p className="font-semibold text-zinc-900 text-base">
+                    {property?.listingType === 1 ? "Seller" : "Landlord"}{" "}
+                    Confirmation
+                  </p>
+                  <p className="text-sm text-zinc-600 mt-0.5">
+                    {confirmationStatus.sellerConfirmed
+                      ? "Confirmed successfully"
+                      : "Awaiting confirmation"}
+                  </p>
+                </div>
+              </div>
+              {isSeller &&
+                !confirmationStatus.sellerConfirmed &&
+                !isDisputed && (
+                  <Button
+                    size="sm"
+                    onClick={handleSellerConfirm}
+                    className="bg-teal-700 hover:bg-teal-800"
+                  >
+                    <CheckCircle size={16} className="mr-1.5" />
+                    Confirm
+                  </Button>
                 )}
-              </div>
-              <div>
-                <p className="font-medium text-slate-900">
-                  {property?.listingType === 1 ? "Seller" : "Landlord"}{" "}
-                  Confirmation
-                </p>
-                <p className="text-xs text-slate-500">
-                  {confirmationStatus.sellerConfirmed
-                    ? "Confirmed"
-                    : "Awaiting confirmation"}
-                </p>
-              </div>
             </div>
-            {isSeller && !confirmationStatus.sellerConfirmed && !isDisputed && (
-              <Button size="sm" onClick={handleSellerConfirm}>
-                Confirm
-              </Button>
-            )}
           </div>
         </div>
 
         {/* Info Box */}
         {!bothConfirmed && !isDisputed && (
-          <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
+          <div className="p-5 bg-teal-50 rounded-lg border border-teal-200">
             <div className="flex gap-3">
-              <FileText
-                className="text-blue-600 flex-shrink-0 mt-0.5"
-                size={18}
-              />
+              <div className="w-10 h-10 bg-teal-700 rounded-lg flex items-center justify-center shrink-0">
+                <Shield className="text-white" size={18} />
+              </div>
               <div className="text-sm">
-                <p className="font-semibold text-blue-900 mb-1">
+                <p className="font-semibold text-teal-900 mb-1.5">
                   Escrow Protection Active
                 </p>
-                <p className="text-blue-700">
-                  Both parties must confirm to release funds. Once both parties
-                  confirm, the transaction will be completed automatically.
+                <p className="text-teal-700 leading-relaxed">
+                  Both parties must confirm to release funds. Once both
+                  confirmations are received, the transaction will be completed
+                  automatically and ownership will transfer.
                 </p>
               </div>
             </div>
@@ -251,19 +270,18 @@ export const EscrowActions = ({ property, escrowId, onStatusChange }) => {
         )}
 
         {bothConfirmed && (
-          <div className="p-4 bg-green-50 rounded-xl border border-green-100">
+          <div className="p-5 bg-emerald-50 rounded-lg border border-emerald-200">
             <div className="flex gap-3">
-              <CheckCircle
-                className="text-green-600 flex-shrink-0 mt-0.5"
-                size={18}
-              />
+              <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center shrink-0">
+                <CheckCircle className="text-white" size={18} />
+              </div>
               <div className="text-sm">
-                <p className="font-semibold text-green-900 mb-1">
-                  Transaction Completed
+                <p className="font-semibold text-emerald-900 mb-1.5">
+                  Transaction Completed Successfully
                 </p>
-                <p className="text-green-700">
+                <p className="text-emerald-700 leading-relaxed">
                   Both parties have confirmed. Funds have been released and
-                  ownership has been transferred.
+                  ownership has been transferred successfully.
                 </p>
               </div>
             </div>
@@ -272,49 +290,72 @@ export const EscrowActions = ({ property, escrowId, onStatusChange }) => {
 
         {/* Dispute Button */}
         {!isDisputed && !bothConfirmed && (isBuyer || isSeller) && (
-          <Button
-            variant="ghost"
-            className="w-full text-red-600 hover:bg-red-50 hover:text-red-700"
-            onClick={() => setShowDisputeModal(true)}
-          >
-            <AlertTriangle size={16} className="mr-2" />
-            Raise Dispute
-          </Button>
+          <div className="pt-4 border-t border-zinc-200">
+            <Button
+              variant="ghost"
+              className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 font-medium"
+              onClick={() => setShowDisputeModal(true)}
+            >
+              <AlertTriangle size={18} className="mr-2" />
+              Raise a Dispute
+            </Button>
+          </div>
         )}
       </div>
 
       {/* Dispute Modal */}
       {showDisputeModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full">
-            <div className="p-6 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-900">
-                Raise a Dispute
-              </h3>
-              <p className="text-sm text-slate-500 mt-1">
-                Please provide a detailed reason for raising this dispute.
-              </p>
-            </div>
-
-            <div className="p-6">
-              <textarea
-                value={disputeReason}
-                onChange={(e) => setDisputeReason(e.target.value)}
-                placeholder="Describe the issue with this transaction..."
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
-                rows={5}
-              />
-
-              <div className="mt-4 p-3 bg-amber-50 rounded-lg">
-                <p className="text-xs text-amber-800">
-                  <strong>Note:</strong> Once a dispute is raised, an admin will
-                  review the case. The transaction will be frozen until the
-                  dispute is resolved.
-                </p>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-lg max-w-lg w-full shadow-2xl animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="px-6 py-5 border-b border-zinc-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                  <AlertTriangle className="text-red-600" size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-zinc-900">
+                    Raise a Dispute
+                  </h3>
+                  <p className="text-sm text-zinc-600 mt-0.5">
+                    Provide details about the issue with this transaction
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="p-6 border-t border-slate-100 flex gap-3">
+            {/* Modal Body */}
+            <div className="p-6">
+              <label className="block text-sm font-medium text-zinc-700 mb-2">
+                Dispute Reason <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={disputeReason}
+                onChange={(e) => setDisputeReason(e.target.value)}
+                placeholder="Please describe the issue in detail. Include relevant facts, dates, and any supporting information..."
+                className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-700/20 focus:border-teal-700 resize-none text-zinc-900 placeholder:text-zinc-400"
+                rows={6}
+              />
+
+              <div className="mt-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                <div className="flex gap-3">
+                  <MessageSquare
+                    className="text-amber-600 shrink-0 mt-0.5"
+                    size={18}
+                  />
+                  <div className="text-xs text-amber-800 leading-relaxed">
+                    <strong className="font-semibold">Important:</strong> Once a
+                    dispute is raised, an admin will review your case
+                    thoroughly. The transaction will be frozen and both parties
+                    will be notified. Please provide accurate and complete
+                    information to expedite the resolution process.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-zinc-50 border-t border-zinc-200 flex gap-3">
               <Button
                 variant="secondary"
                 className="flex-1"
@@ -328,7 +369,9 @@ export const EscrowActions = ({ property, escrowId, onStatusChange }) => {
               <Button
                 className="flex-1 bg-red-600 hover:bg-red-700"
                 onClick={handleRaiseDispute}
+                disabled={!disputeReason.trim()}
               >
+                <AlertTriangle size={16} className="mr-2" />
                 Submit Dispute
               </Button>
             </div>

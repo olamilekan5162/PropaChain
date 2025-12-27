@@ -23,15 +23,15 @@ export const ReceiptCard = ({ receipt, onViewDetails, onDownload }) => {
   const getStatusColor = (status) => {
     switch (status) {
       case "Completed":
-        return "bg-green-50 border-green-200 text-green-900";
+        return "bg-teal-50 border-teal-200 text-teal-900";
       case "Dispute Raised":
         return "bg-red-50 border-red-200 text-red-900";
       case "Partially Confirmed":
         return "bg-blue-50 border-blue-200 text-blue-900";
       case "Awaiting Confirmation":
-        return "bg-yellow-50 border-yellow-200 text-yellow-900";
+        return "bg-amber-50 border-amber-200 text-amber-900";
       default:
-        return "bg-slate-50 border-slate-200 text-slate-900";
+        return "bg-zinc-50 border-zinc-200 text-zinc-900";
     }
   };
 
@@ -51,46 +51,46 @@ export const ReceiptCard = ({ receipt, onViewDetails, onDownload }) => {
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+    <div className="bg-white border border-zinc-200 rounded-lg p-5 hover:shadow-md hover:border-teal-700 transition-all">
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-start gap-3 flex-1">
-          <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600 flex-shrink-0">
-            <FileText size={20} />
+          <div className="w-11 h-11 bg-teal-50 rounded-lg flex items-center justify-center text-teal-700 shrink-0">
+            <FileText size={22} />
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-slate-900 text-sm truncate">
+            <h4 className="font-semibold text-gray-900 text-sm truncate">
               {receipt.property_type} - {receipt.listingType}
             </h4>
-            <p className="text-xs text-slate-500 truncate">
+            <p className="text-xs text-gray-500 truncate">
               {receipt.property_address}
             </p>
           </div>
         </div>
-        <div className="text-right flex-shrink-0 ml-4">
-          <p className="font-bold text-slate-900">{receipt.formattedAmount}</p>
-          <p className="text-xs text-slate-500">MOVE</p>
+        <div className="text-right shrink-0 ml-4">
+          <p className="font-bold text-gray-900">{receipt.formattedAmount}</p>
+          <p className="text-xs text-gray-500">MOVE</p>
         </div>
       </div>
 
       {/* Details */}
-      <div className="space-y-2 mb-4 pb-4 border-b border-slate-100">
+      <div className="space-y-2 mb-4 pb-4 border-b border-gray-100">
         <div className="flex justify-between text-xs">
-          <span className="text-slate-600">Escrow ID</span>
+          <span className="text-gray-600">Escrow ID</span>
           <span
-            className="text-slate-900 font-mono text-xs truncate max-w-[150px]"
+            className="text-gray-900 font-mono text-xs truncate max-w-37.5"
             title={receipt.escrow_id}
           >
             {String(receipt.escrow_id).substring(0, 16)}...
           </span>
         </div>
         <div className="flex justify-between text-xs">
-          <span className="text-slate-600">Date</span>
-          <span className="text-slate-900">{receipt.formattedDate}</span>
+          <span className="text-gray-600">Date</span>
+          <span className="text-gray-900">{receipt.formattedDate}</span>
         </div>
         <div className="flex justify-between text-xs">
-          <span className="text-slate-600">Type</span>
-          <span className="text-slate-900">{receipt.listingType}</span>
+          <span className="text-gray-600">Type</span>
+          <span className="text-gray-900">{receipt.listingType}</span>
         </div>
       </div>
 
@@ -107,7 +107,7 @@ export const ReceiptCard = ({ receipt, onViewDetails, onDownload }) => {
         <div className="flex gap-2">
           <button
             onClick={onViewDetails}
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
           >
             View Details
             <ChevronRight size={14} />

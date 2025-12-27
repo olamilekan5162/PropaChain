@@ -1,80 +1,94 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeftRight,
   CheckCircle2,
   Clock,
   AlertTriangle,
   Eye,
   Building2,
   Loader2,
-  FileX,
+  Filter,
+  Wallet,
+  ArrowUpRight,
+  FileText,
 } from "lucide-react";
 import { Button } from "../components/common/Button";
+import { ReceiptModal } from "../components/features/ReceiptModal";
 import { useMovementWallet } from "../hooks/useMovementWallet";
-import { useReceipts } from "../hooks/useReceipts";
+import { useEscrows } from "../hooks/useEscrows";
 import { useFetchProperties } from "../hooks/useFetchProperties";
 import { usePropertyOperations } from "../hooks/usePropertyOperations";
+import { addressesEqual } from "../utils/helper";
 import toast from "react-hot-toast";
+
+const GATEWAY_URL = import.meta.env.VITE_PINATA_GATEWAY;
 
 export default function Transactions() {
   const navigate = useNavigate();
   const { walletAddress } = useMovementWallet();
-  const { getUserReceipts } = useReceipts();
+  const { fetchUserEscrows } = useEscrows();
   const { fetchAllProperties } = useFetchProperties();
-  const {
-    getConfirmationStatus,
-    buyerRenterConfirms,
-    sellerLandlordConfirms,
-    isDisputeRaised,
-  } = usePropertyOperations();
+  const { buyerRenterConfirms, sellerLandlordConfirms, isDisputeRaised } =
+    usePropertyOperations();
 
-  const [activeTab, setActiveTab] = useState("all"); // all, pending, completed
+  const [activeTab, setActiveTab] = useState("all");
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confirmingId, setConfirmingId] = useState(null);
+  const [selectedReceiptId, setSelectedReceiptId] = useState(null);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
 
   useEffect(() => {
     if (walletAddress) {
       loadTransactions();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletAddress]);
 
   const loadTransactions = async () => {
     try {
       setLoading(true);
 
-      // Get user's receipts
-      const receipts = await getUserReceipts(walletAddress);
-
-      console.log("receipts", receipts);
-
-      // Get all properties to match with receipts
+      // Fetch user's escrows (where user is buyer or seller)
+      const escrows = await fetchUserEscrows(walletAddress);
       const allProperties = await fetchAllProperties();
 
-      console.log("All prop:", allProperties);
-
-      // Enrich receipts with property data and confirmation status
+      // Enrich escrows with property data and dispute status
       const enrichedTransactions = await Promise.all(
-        receipts.map(async (receipt) => {
+        escrows.map(async (escrow) => {
           const property = allProperties.find(
-            (p) => p.id === receipt.property_id
+            (p) => p.id === escrow.property_id
           );
-          const confirmationStatus = await getConfirmationStatus(
-            receipt.escrowId
+          const hasDispute = await isDisputeRaised(escrow.id);
+
+          const isUserBuyer = addressesEqual(
+            escrow.buyer_renter,
+            walletAddress
           );
-          const hasDispute = await isDisputeRaised(receipt.escrowId);
 
           return {
-            ...receipt,
-            property,
-            confirmationStatus,
+            escrowId: escrow.id,
+            propertyId: escrow.property_id,
+            listingType: escrow.listing_type === 1 ? "sale" : "rent",
+            buyerAddress: escrow.buyer_renter,
+            sellerAddress: escrow.seller_landlord,
+            amount_paid: escrow.amount,
+            buyerReceiptId: escrow.buyer_renter_receipt_id?.vec?.[0],
+            sellerReceiptId: escrow.seller_landlord_receipt_id?.vec?.[0],
+            confirmationStatus: {
+              buyer: escrow.buyer_renter_confirmed,
+              seller: escrow.seller_landlord_confirmed,
+              buyerConfirmed: escrow.buyer_renter_confirmed,
+              sellerConfirmed: escrow.seller_landlord_confirmed,
+            },
+            escrowStatus: escrow.resolved ? "COMPLETED" : "IN_ESCROW",
             hasDispute,
+            isUserBuyer,
+            property,
+            createdAt: escrow.created_at,
           };
         })
       );
-
-      console.log(enrichedTransactions);
 
       setTransactions(enrichedTransactions);
     } catch (error) {
@@ -86,7 +100,7 @@ export default function Transactions() {
   };
 
   const handleConfirm = async (transaction) => {
-    const isUserBuyer = transaction.buyerAddress === walletAddress;
+    const isUserBuyer = addressesEqual(transaction.buyerAddress, walletAddress);
 
     try {
       setConfirmingId(transaction.escrowId);
@@ -99,7 +113,6 @@ export default function Transactions() {
         toast.success("Transaction confirmed successfully!");
       }
 
-      // Reload transactions to update status
       await loadTransactions();
     } catch (error) {
       console.error("Error confirming transaction:", error);
@@ -123,166 +136,203 @@ export default function Transactions() {
         !tx.hasDispute
       );
     }
-    return true; // all
+    return true;
   });
 
   const TransactionCard = ({ transaction }) => {
-    const isUserBuyer = transaction.buyerAddress === walletAddress;
+    const isUserBuyer = transaction.isUserBuyer;
     const needsAction =
       (isUserBuyer && !transaction.confirmationStatus?.buyer) ||
       (!isUserBuyer && !transaction.confirmationStatus?.seller);
     const isConfirming = confirmingId === transaction.escrowId;
 
+    const propertyImage =
+      transaction.property?.image ||
+      "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800";
+
     return (
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-lg transition-all">
-        <div className="flex items-start gap-4">
-          {/* Property Image */}
-          <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0">
-            {transaction.property?.image ? (
-              <img
-                src={transaction.property.image}
-                alt=""
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <Building2 size={32} className="text-slate-400" />
-              </div>
-            )}
-          </div>
-
-          {/* Transaction Details */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-4 mb-3">
-              <div>
-                <h3 className="font-bold text-slate-900 text-lg mb-1">
-                  {transaction.property?.property_type ||
-                    `Property #${transaction.propertyId}`}
-                </h3>
-                <p className="text-sm text-slate-500">
-                  {transaction.property?.property_address ||
-                    "Location unavailable"}
-                </p>
-              </div>
-              {transaction.isDisputed ? (
-                <span className="flex items-center gap-1 px-3 py-1 bg-red-100 text-red-600 rounded-full text-xs font-medium">
-                  <AlertTriangle size={14} />
-                  Disputed
-                </span>
-              ) : needsAction ? (
-                <span className="flex items-center gap-1 px-3 py-1 bg-orange-100 text-orange-600 rounded-full text-xs font-medium">
-                  <Clock size={14} />
-                  Action Needed
-                </span>
+      <div className="bg-white rounded-lg border border-zinc-200 overflow-hidden hover:border-teal-700 hover:shadow-lg transition-all">
+        <div className="p-6">
+          <div className="flex items-start gap-4">
+            {/* Property Image */}
+            <div className="w-28 h-28 rounded-lg overflow-hidden bg-zinc-100 shrink-0">
+              {propertyImage ? (
+                <img
+                  src={propertyImage}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.src =
+                      "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800";
+                  }}
+                />
               ) : (
-                <span className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-600 rounded-full text-xs font-medium">
-                  <CheckCircle2 size={14} />
-                  Confirmed
-                </span>
+                <div className="w-full h-full flex items-center justify-center">
+                  <Building2 size={32} className="text-zinc-400" />
+                </div>
               )}
             </div>
 
-            {/* Details Grid */}
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 mb-4 text-sm">
-              <div>
-                <p className="text-slate-500">Amount</p>
-                <p className="font-semibold text-slate-900">
-                  {(
-                    parseInt(transaction.amount_paid || 0) / 100_000_000
-                  ).toFixed(2)}{" "}
-                  MOVE
-                </p>
-              </div>
-              <div>
-                <p className="text-slate-500">Type</p>
-                <p className="font-semibold text-slate-900 capitalize">
-                  {transaction.listingType || "Purchase"}
-                </p>
-              </div>
-              <div>
-                <p className="text-slate-500">Your Role</p>
-                <p className="font-semibold text-slate-900">
-                  {isUserBuyer ? "Buyer" : "Seller"}
-                </p>
-              </div>
-              <div>
-                <p className="text-slate-500">Status</p>
-                <p className="font-semibold text-slate-900">
-                  {transaction.escrowStatus || "In Escrow"}
-                </p>
-              </div>
-            </div>
-
-            {/* Confirmation Status */}
-            <div className="flex items-center gap-6 mb-4 pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                {transaction.confirmationStatus?.buyerConfirmed ? (
-                  <CheckCircle2 size={18} className="text-green-600" />
+            {/* Transaction Details */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-zinc-900 mb-1">
+                    {transaction.property?.title ||
+                      `Property #${transaction.propertyId}`}
+                  </h3>
+                  <p className="text-sm text-zinc-500 flex items-center gap-1">
+                    {transaction.property?.location || "Location unavailable"}
+                  </p>
+                </div>
+                {transaction.hasDispute ? (
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-medium">
+                    <AlertTriangle size={14} />
+                    Disputed
+                  </span>
+                ) : needsAction ? (
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg text-xs font-medium">
+                    <Clock size={14} />
+                    Action Required
+                  </span>
                 ) : (
-                  <Clock size={18} className="text-slate-300" />
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-100 text-teal-700 rounded-lg text-xs font-medium">
+                    <CheckCircle2 size={14} />
+                    Confirmed
+                  </span>
                 )}
-                <span
-                  className={`text-sm ${
-                    transaction.confirmationStatus?.buyerConfirmed
-                      ? "text-green-600 font-medium"
-                      : "text-slate-400"
-                  }`}
-                >
-                  Buyer Confirmed
-                </span>
               </div>
-              <div className="flex items-center gap-2">
-                {transaction.confirmationStatus?.sellerConfirmed ? (
-                  <CheckCircle2 size={18} className="text-green-600" />
-                ) : (
-                  <Clock size={18} className="text-slate-300" />
-                )}
-                <span
-                  className={`text-sm ${
-                    transaction.confirmationStatus?.sellerConfirmed
-                      ? "text-green-600 font-medium"
-                      : "text-slate-400"
-                  }`}
-                >
-                  Seller Confirmed
-                </span>
-              </div>
-            </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-3">
-              {needsAction && !transaction.hasDispute && (
-                <Button
-                  onClick={() => handleConfirm(transaction)}
-                  disabled={isConfirming}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                >
-                  {isConfirming ? (
-                    <>
-                      <Loader2 size={16} className="mr-2 animate-spin" />
-                      Confirming...
-                    </>
+              {/* Stats Grid */}
+              <div className="grid grid-cols-4 gap-4 mb-4 pb-4 border-b border-zinc-200">
+                <div>
+                  <p className="text-xs text-zinc-500 mb-1">Amount</p>
+                  <p className="font-semibold text-zinc-900">
+                    {(
+                      parseInt(transaction.amount_paid || 0) / 100_000_000
+                    ).toFixed(2)}{" "}
+                    <span className="text-xs text-zinc-500">MOVE</span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-500 mb-1">Type</p>
+                  <p className="font-semibold text-zinc-900 capitalize">
+                    {transaction.listingType || "Purchase"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-500 mb-1">Your Role</p>
+                  <p className="font-semibold text-zinc-900">
+                    {isUserBuyer ? "Buyer" : "Seller"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-zinc-500 mb-1">Status</p>
+                  <p className="font-semibold text-zinc-900">
+                    {transaction.escrowStatus || "In Escrow"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Confirmation Progress */}
+              <div className="flex items-center gap-6 mb-4">
+                <div className="flex items-center gap-2">
+                  {transaction.confirmationStatus?.buyerConfirmed ? (
+                    <div className="w-5 h-5 bg-teal-100 rounded-full flex items-center justify-center">
+                      <CheckCircle2 size={14} className="text-teal-700" />
+                    </div>
                   ) : (
-                    <>
-                      <CheckCircle2 size={16} className="mr-2" />
-                      Confirm Transaction
-                    </>
+                    <div className="w-5 h-5 bg-zinc-100 rounded-full flex items-center justify-center">
+                      <Clock size={14} className="text-zinc-400" />
+                    </div>
                   )}
+                  <span
+                    className={`text-sm ${
+                      transaction.confirmationStatus?.buyerConfirmed
+                        ? "text-teal-700 font-medium"
+                        : "text-zinc-400"
+                    }`}
+                  >
+                    Buyer Confirmed
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {transaction.confirmationStatus?.sellerConfirmed ? (
+                    <div className="w-5 h-5 bg-teal-100 rounded-full flex items-center justify-center">
+                      <CheckCircle2 size={14} className="text-teal-700" />
+                    </div>
+                  ) : (
+                    <div className="w-5 h-5 bg-zinc-100 rounded-full flex items-center justify-center">
+                      <Clock size={14} className="text-zinc-400" />
+                    </div>
+                  )}
+                  <span
+                    className={`text-sm ${
+                      transaction.confirmationStatus?.sellerConfirmed
+                        ? "text-teal-700 font-medium"
+                        : "text-zinc-400"
+                    }`}
+                  >
+                    Seller Confirmed
+                  </span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-3">
+                {needsAction && !transaction.hasDispute && (
+                  <Button
+                    onClick={() => handleConfirm(transaction)}
+                    disabled={isConfirming}
+                    className="h-10"
+                  >
+                    {isConfirming ? (
+                      <>
+                        <Loader2 size={16} className="mr-2 animate-spin" />
+                        Confirming...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 size={16} className="mr-2" />
+                        Confirm Transaction
+                      </>
+                    )}
+                  </Button>
+                )}
+                {(transaction.buyerReceiptId ||
+                  transaction.sellerReceiptId) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const receiptId = transaction.isUserBuyer
+                        ? transaction.buyerReceiptId
+                        : transaction.sellerReceiptId;
+                      if (receiptId) {
+                        setSelectedReceiptId(receiptId);
+                        setIsReceiptModalOpen(true);
+                      }
+                    }}
+                    className="h-10"
+                  >
+                    <FileText size={16} className="mr-2" />
+                    View Receipt
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    navigate(
+                      `/property/${
+                        transaction.property?.id || transaction.propertyId
+                      }`
+                    )
+                  }
+                  className="h-10"
+                >
+                  <Eye size={16} className="mr-2" />
+                  View Property
                 </Button>
-              )}
-              <Button
-                variant="outline"
-                onClick={() =>
-                  navigate(
-                    `/app/property/${
-                      transaction.property?.id || transaction.propertyId
-                    }`
-                  )
-                }
-              >
-                <Eye size={16} className="mr-2" />
-                View Property
-              </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -292,104 +342,182 @@ export default function Transactions() {
 
   if (!walletAddress) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mb-6">
-          <ArrowLeftRight size={40} className="text-blue-600" />
+      <div className="min-h-screen bg-zinc-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-xl border border-zinc-200 p-8 text-center">
+          <div className="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Wallet size={32} className="text-teal-700" />
+          </div>
+          <h2 className="text-2xl font-semibold text-zinc-900 mb-2">
+            Connect Your Wallet
+          </h2>
+          <p className="text-zinc-600 mb-6">
+            Please connect your wallet to view your transactions
+          </p>
+          <Button onClick={() => navigate("/")}>Go to Home</Button>
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">
-          Connect Your Wallet
-        </h2>
-        <p className="text-slate-500">
-          Please connect your wallet to view transactions
-        </p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">Transactions</h1>
-        <p className="text-slate-600">
-          Manage and track all your property transactions
-        </p>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200">
-        <button
-          onClick={() => setActiveTab("all")}
-          className={`px-6 py-3 font-medium transition-all relative ${
-            activeTab === "all"
-              ? "text-blue-600"
-              : "text-slate-500 hover:text-slate-900"
-          }`}
-        >
-          All Transactions
-          {activeTab === "all" && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab("pending")}
-          className={`px-6 py-3 font-medium transition-all relative ${
-            activeTab === "pending"
-              ? "text-blue-600"
-              : "text-slate-500 hover:text-slate-900"
-          }`}
-        >
-          Pending
-          {activeTab === "pending" && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab("completed")}
-          className={`px-6 py-3 font-medium transition-all relative ${
-            activeTab === "completed"
-              ? "text-blue-600"
-              : "text-slate-500 hover:text-slate-900"
-          }`}
-        >
-          Completed
-          {activeTab === "completed" && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
-          )}
-        </button>
-      </div>
-
-      {/* Transactions List */}
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-12 w-12 text-blue-600 animate-spin" />
-        </div>
-      ) : filteredTransactions.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-3xl border border-slate-200">
-          <div className="w-20 h-20 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center mx-auto mb-6">
-            <FileX size={40} className="text-slate-400" />
-          </div>
-          <h3 className="text-xl font-bold text-slate-900 mb-2">
-            No Transactions Found
-          </h3>
-          <p className="text-slate-500 mb-6">
-            {activeTab === "pending"
-              ? "You don't have any pending transactions"
-              : activeTab === "completed"
-              ? "You haven't completed any transactions yet"
-              : "Start by purchasing or listing a property"}
+    <div className="min-h-screen bg-zinc-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-semibold text-zinc-900 mb-2">
+            Transaction History
+          </h1>
+          <p className="text-zinc-600">
+            Track and manage all your property transactions
           </p>
-          <Button onClick={() => navigate("/app/marketplace")}>
-            Browse Properties
-          </Button>
         </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredTransactions.map((tx, idx) => (
-            <TransactionCard key={`${tx.escrowId}-${idx}`} transaction={tx} />
-          ))}
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white rounded-lg border border-zinc-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-teal-50 rounded-lg flex items-center justify-center">
+                <ArrowUpRight size={24} className="text-teal-700" />
+              </div>
+              <span className="text-xs text-zinc-500 font-medium">
+                ALL TIME
+              </span>
+            </div>
+            <p className="text-2xl font-semibold text-zinc-900 mb-1">
+              {transactions.length}
+            </p>
+            <p className="text-sm text-zinc-600">Total Transactions</p>
+          </div>
+
+          <div className="bg-white rounded-lg border border-zinc-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-amber-50 rounded-lg flex items-center justify-center">
+                <Clock size={24} className="text-amber-600" />
+              </div>
+              <span className="text-xs text-zinc-500 font-medium">PENDING</span>
+            </div>
+            <p className="text-2xl font-semibold text-zinc-900 mb-1">
+              {
+                transactions.filter(
+                  (tx) =>
+                    !tx.confirmationStatus?.buyer ||
+                    !tx.confirmationStatus?.seller
+                ).length
+              }
+            </p>
+            <p className="text-sm text-zinc-600">Awaiting Confirmation</p>
+          </div>
+
+          <div className="bg-white rounded-lg border border-zinc-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-teal-50 rounded-lg flex items-center justify-center">
+                <CheckCircle2 size={24} className="text-teal-700" />
+              </div>
+              <span className="text-xs text-zinc-500 font-medium">
+                COMPLETED
+              </span>
+            </div>
+            <p className="text-2xl font-semibold text-zinc-900 mb-1">
+              {
+                transactions.filter(
+                  (tx) =>
+                    tx.confirmationStatus?.buyer &&
+                    tx.confirmationStatus?.seller
+                ).length
+              }
+            </p>
+            <p className="text-sm text-zinc-600">Successfully Completed</p>
+          </div>
         </div>
-      )}
+
+        {/* Tabs & Filter */}
+        <div className="bg-white rounded-lg border border-zinc-200 mb-6">
+          <div className="flex items-center justify-between p-1">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setActiveTab("all")}
+                className={`px-6 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                  activeTab === "all"
+                    ? "bg-teal-700 text-white"
+                    : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
+                }`}
+              >
+                All Transactions
+              </button>
+              <button
+                onClick={() => setActiveTab("pending")}
+                className={`px-6 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                  activeTab === "pending"
+                    ? "bg-teal-700 text-white"
+                    : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
+                }`}
+              >
+                Pending
+              </button>
+              <button
+                onClick={() => setActiveTab("completed")}
+                className={`px-6 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                  activeTab === "completed"
+                    ? "bg-teal-700 text-white"
+                    : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
+                }`}
+              >
+                Completed
+              </button>
+            </div>
+            <button className="p-2.5 text-zinc-600 hover:bg-zinc-50 rounded-lg transition-colors">
+              <Filter size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Transactions List */}
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="h-12 w-12 text-teal-700 animate-spin" />
+              <p className="text-zinc-600 font-medium">
+                Loading transactions...
+              </p>
+            </div>
+          </div>
+        ) : filteredTransactions.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-lg border border-zinc-200">
+            <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Building2 size={32} className="text-zinc-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-zinc-900 mb-2">
+              No Transactions Found
+            </h3>
+            <p className="text-zinc-600 mb-6">
+              {activeTab === "pending"
+                ? "You don't have any pending transactions"
+                : activeTab === "completed"
+                ? "You haven't completed any transactions yet"
+                : "Start by purchasing or listing a property"}
+            </p>
+            <Button onClick={() => navigate("/marketplace")}>
+              Browse Properties
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredTransactions.map((tx, idx) => (
+              <TransactionCard key={`${tx.escrowId}-${idx}`} transaction={tx} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Receipt Modal */}
+      <ReceiptModal
+        isOpen={isReceiptModalOpen}
+        onClose={() => {
+          setIsReceiptModalOpen(false);
+          setSelectedReceiptId(null);
+        }}
+        receiptId={selectedReceiptId}
+      />
     </div>
   );
 }

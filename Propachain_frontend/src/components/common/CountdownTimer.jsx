@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 export const CountdownTimer = ({ targetDate, className }) => {
   const calculateTimeLeft = () => {
@@ -29,28 +29,36 @@ export const CountdownTimer = ({ targetDate, className }) => {
     return () => clearTimeout(timer);
   });
 
-  const pad = (n) => n < 10 ? `0${n}` : n;
+  const pad = (n) => (n < 10 ? `0${n}` : n);
 
   return (
-    <div className={`flex gap-4 ${className}`}>
-      <div className="flex flex-col items-center">
-        <span className="text-2xl font-bold font-mono text-primary">{pad(timeLeft.days)}</span>
-        <span className="text-xs text-slate-500 uppercase">Days</span>
+    <div className={`flex gap-3 ${className}`}>
+      <div className="flex flex-col items-center bg-teal-50 rounded-lg px-3 py-2">
+        <span className="text-2xl font-semibold font-mono text-teal-700">
+          {pad(timeLeft.days)}
+        </span>
+        <span className="text-xs text-zinc-600 font-medium">Days</span>
       </div>
-      <div className="text-2xl font-bold text-slate-300">:</div>
-      <div className="flex flex-col items-center">
-        <span className="text-2xl font-bold font-mono text-primary">{pad(timeLeft.hours)}</span>
-        <span className="text-xs text-slate-500 uppercase">Hours</span>
+      <div className="text-2xl font-semibold text-zinc-300 self-center">:</div>
+      <div className="flex flex-col items-center bg-teal-50 rounded-lg px-3 py-2">
+        <span className="text-2xl font-semibold font-mono text-teal-700">
+          {pad(timeLeft.hours)}
+        </span>
+        <span className="text-xs text-zinc-600 font-medium">Hrs</span>
       </div>
-      <div className="text-2xl font-bold text-slate-300">:</div>
-      <div className="flex flex-col items-center">
-        <span className="text-2xl font-bold font-mono text-primary">{pad(timeLeft.minutes)}</span>
-        <span className="text-xs text-slate-500 uppercase">Mins</span>
+      <div className="text-2xl font-semibold text-zinc-300 self-center">:</div>
+      <div className="flex flex-col items-center bg-teal-50 rounded-lg px-3 py-2">
+        <span className="text-2xl font-semibold font-mono text-teal-700">
+          {pad(timeLeft.minutes)}
+        </span>
+        <span className="text-xs text-zinc-600 font-medium">Mins</span>
       </div>
-      <div className="text-2xl font-bold text-slate-300">:</div>
-      <div className="flex flex-col items-center">
-        <span className="text-2xl font-bold font-mono text-primary">{pad(timeLeft.seconds)}</span>
-        <span className="text-xs text-slate-500 uppercase">Secs</span>
+      <div className="text-2xl font-semibold text-zinc-300 self-center">:</div>
+      <div className="flex flex-col items-center bg-teal-50 rounded-lg px-3 py-2">
+        <span className="text-2xl font-semibold font-mono text-teal-700">
+          {pad(timeLeft.seconds)}
+        </span>
+        <span className="text-xs text-zinc-600 font-medium">Secs</span>
       </div>
     </div>
   );

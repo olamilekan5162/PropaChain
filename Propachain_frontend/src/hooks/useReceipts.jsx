@@ -37,11 +37,11 @@ export const useReceipts = () => {
 
       console.log("User receipt IDs:", receiptIds);
 
-      // If user has receipt IDs, fetch each receipt with escrow details
+      // If user has receipt IDs, fetch each receipt
       if (receiptIds && receiptIds[0] && receiptIds[0].length > 0) {
         for (const receiptId of receiptIds[0]) {
           try {
-            const receiptData = await getReceiptWithEscrow(receiptId);
+            const receiptData = await getReceipt(receiptId);
             if (receiptData) {
               userReceipts.push(receiptData);
             }
@@ -98,7 +98,6 @@ export const useReceipts = () => {
     return {
       ...receipt,
       id: receipt.id,
-      escrow_id: receipt.id, // Map NFT id to escrow_id for UI compatibility
       formattedAmount: (parseInt(receipt.amount_paid) / 100_000_000).toFixed(2),
       formattedDate: new Date(
         parseInt(receipt.timestamp) * 1000
@@ -108,41 +107,22 @@ export const useReceipts = () => {
   };
 
   /**
-   * Get receipt status with color coding
+   * Get receipt status - Receipts are NFTs, they don't have confirmations
+   * Status is based on the receipt data itself
    */
   const getReceiptStatus = (receipt) => {
-    // Determine status based on confirmations and dispute
-    if (receipt.is_disputed) {
-      return {
-        status: "Dispute Raised",
-        color: "bg-red-100 text-red-800",
-      };
-    }
-
-    if (receipt.buyer_confirmed && receipt.seller_confirmed) {
-      return {
-        status: "Completed",
-        color: "bg-green-100 text-green-800",
-      };
-    }
-
-    if (receipt.buyer_confirmed || receipt.seller_confirmed) {
-      return {
-        status: "Partially Confirmed",
-        color: "bg-blue-100 text-blue-800",
-      };
-    }
-
+    // Receipt NFTs are minted when transaction is created
+    // They represent proof of transaction
     return {
-      status: "Awaiting Confirmation",
-      color: "bg-yellow-100 text-yellow-800",
+      status: "Minted",
+      color: "bg-teal-100 text-teal-800",
     };
   };
 
   /**
-   * Get receipt with escrow details
+   * Get a single receipt by ID
    */
-  const getReceiptWithEscrow = async (receiptId) => {
+  const getReceipt = async (receiptId) => {
     try {
       const receiptData = await aptos.view({
         payload: {
@@ -153,68 +133,11 @@ export const useReceipts = () => {
       });
 
       if (receiptData && receiptData[0]) {
-        const receipt = receiptData[0];
-
-        // Get property details to find escrow ID
-        const propertyData = await aptos.view({
-          payload: {
-            function: `${CONTRACT_ADDRESS}::propachain::get_property`,
-            functionArguments: [
-              CONTRACT_ADDRESS,
-              receipt.property_id.toString(),
-            ],
-            typeArguments: [],
-          },
-        });
-
-        console.log("PropData:", propertyData);
-
-        const escrowId = propertyData[0]?.escrow_id?.vec?.[0];
-
-        // If there's an escrow, get confirmation status
-        let confirmationStatus = {
-          buyerConfirmed: false,
-          sellerConfirmed: false,
-        };
-        let isDisputed = false;
-
-        if (escrowId) {
-          try {
-            const status = await aptos.view({
-              payload: {
-                function: `${CONTRACT_ADDRESS}::propachain::get_confirmation_status`,
-                functionArguments: [CONTRACT_ADDRESS, escrowId.toString()],
-                typeArguments: [],
-              },
-            });
-            confirmationStatus = {
-              buyerConfirmed: status[0],
-              sellerConfirmed: status[1],
-            };
-
-            const disputeStatus = await aptos.view({
-              payload: {
-                function: `${CONTRACT_ADDRESS}::propachain::is_dispute_raised`,
-                functionArguments: [CONTRACT_ADDRESS, escrowId.toString()],
-                typeArguments: [],
-              },
-            });
-            isDisputed = disputeStatus[0];
-          } catch (err) {
-            console.error("Error fetching escrow status:", err);
-          }
-        }
-
-        return {
-          ...formatReceipt(receipt),
-          escrowId,
-          buyer_confirmed: confirmationStatus.buyerConfirmed,
-          seller_confirmed: confirmationStatus.sellerConfirmed,
-          is_disputed: isDisputed,
-        };
+        return formatReceipt(receiptData[0]);
       }
+      return null;
     } catch (err) {
-      console.error(`Error fetching receipt with escrow:`, err);
+      console.error(`Error fetching receipt ${receiptId}:`, err);
       throw err;
     }
   };
@@ -227,6 +150,6 @@ export const useReceipts = () => {
     generateReceiptAfterDeposit,
     formatReceipt,
     getReceiptStatus,
-    getReceiptWithEscrow,
+    getReceipt,
   };
 };

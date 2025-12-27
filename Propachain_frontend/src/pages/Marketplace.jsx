@@ -21,49 +21,24 @@ export default function Marketplace() {
   // Fetch properties on component mount
   useEffect(() => {
     loadProperties();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Apply filters whenever filter criteria changes
+  useEffect(() => {
+    applyFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterType, searchLocation, minPrice, maxPrice, properties]);
 
   const loadProperties = async () => {
     try {
       setLoading(true);
       const props = await fetchAllProperties();
 
-      // Transform blockchain data to UI format
-      const formattedProps = props
-        .filter((p) => p.status === 1 || p.status === 2) // Available or In Escrow
-        .map((p) => ({
-          id: p.id,
-          title: p.description
-            ? p.description.substring(0, 50) +
-              (p.description.length > 50 ? "..." : "")
-            : `Property #${p.id}`,
-          location: p.property_address || "Location not specified",
-          price: parseInt(p.price || 0) / 100_000_000,
-          rentPrice: p.monthly_rent
-            ? parseInt(p.monthly_rent) / 100_000_000
-            : 0,
-          image:
-            p.images_cids && p.images_cids.length > 0
-              ? `https://${GATEWAY_URL}/ipfs/${p.images_cids[0]}`
-              : "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800",
-          beds: 3,
-          baths: 2,
-          sqft: 2200,
-          status:
-            p.status === 1
-              ? "Available"
-              : p.status === 2
-              ? "In Escrow"
-              : p.status === 3
-              ? "Sold"
-              : "Rented",
-          listingType: p.listing_type,
-          propertyType: p.property_type,
-          owner: p.owner,
-        }));
+      // Filter to show only available properties (status 1)
+      const availableProps = props.filter((p) => p.status === 1);
 
-      setProperties(formattedProps);
-      setDisplayedProperties(formattedProps);
+      setProperties(availableProps);
     } catch (error) {
       console.error("Failed to fetch properties:", error);
       toast.error("Failed to load properties");
@@ -74,164 +49,186 @@ export default function Marketplace() {
     }
   };
 
-  // Transform blockchain property data to match PropertyCard format
-  const transformedProperties = displayedProperties.map((prop) => ({
-    id: prop.id,
-    title: prop.description?.substring(0, 50) || "Property",
-    location: prop.property_address || "Unknown Location",
-    price: parseInt(prop.price) / 100_000_000, // Convert from octas
-    image:
-      "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800", // Placeholder
-    beds: 3, // Would need to parse from description
-    baths: 2,
-    sqft: 2200,
-    status: prop.listing_type === 1 ? "For Sale" : "For Rent",
-    monthlyRent:
-      prop.listing_type === 2
-        ? parseInt(prop.monthly_rent || 0) / 100_000_000
-        : null,
-  }));
+  const applyFilters = () => {
+    let filtered = [...properties];
 
-  // Apply filters
-  const filteredProperties = transformedProperties.filter((prop) => {
-    // Filter by listing type
-    if (filterType === "sale" && prop.status !== "For Sale") return false;
-    if (filterType === "rent" && prop.status !== "For Rent") return false;
+    // Filter by listing type (sale/rent)
+    // listing_type: 1 = Sale, 2 = Rent
+    if (filterType === "buy") {
+      filtered = filtered.filter((p) => p.listing_type === 1);
+    } else if (filterType === "rent") {
+      filtered = filtered.filter((p) => p.listing_type === 2);
+    }
 
-    // Filter by location (case-insensitive)
-    if (
-      searchLocation &&
-      !prop.location.toLowerCase().includes(searchLocation.toLowerCase())
-    ) {
-      return false;
+    // Filter by location
+    if (searchLocation.trim()) {
+      const searchTerm = searchLocation.toLowerCase();
+      filtered = filtered.filter((p) =>
+        p.location?.toLowerCase().includes(searchTerm)
+      );
     }
 
     // Filter by price range
-    if (minPrice && prop.price < parseFloat(minPrice)) return false;
-    if (maxPrice && prop.price > parseFloat(maxPrice)) return false;
+    if (minPrice) {
+      filtered = filtered.filter((p) => p.price >= Number(minPrice));
+    }
+    if (maxPrice) {
+      filtered = filtered.filter((p) => p.price <= Number(maxPrice));
+    }
 
-    return true;
-  });
+    setDisplayedProperties(filtered);
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Marketplace</h1>
-          <p className="text-slate-500">
-            Discover and trade real estate on Movement.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <div className="bg-slate-100 p-1 rounded-lg flex">
+    <div className="min-h-screen bg-zinc-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold text-zinc-900">
+              Marketplace
+            </h1>
+            <p className="text-zinc-600">
+              Discover and trade real estate on Movement blockchain
+            </p>
+          </div>
+          <div className="inline-flex bg-white border border-zinc-200 rounded-lg p-1">
             <button
               onClick={() => setFilterType("all")}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 filterType === "all"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-900"
+                  ? "bg-teal-700 text-white"
+                  : "text-zinc-600 hover:text-zinc-900"
               }`}
             >
               All
             </button>
             <button
               onClick={() => setFilterType("buy")}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 filterType === "buy"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-900"
+                  ? "bg-teal-700 text-white"
+                  : "text-zinc-600 hover:text-zinc-900"
               }`}
             >
-              Buy
+              For Sale
             </button>
             <button
               onClick={() => setFilterType("rent")}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 filterType === "rent"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-900"
+                  ? "bg-teal-700 text-white"
+                  : "text-zinc-600 hover:text-zinc-900"
               }`}
             >
-              Rent
+              For Rent
             </button>
           </div>
         </div>
-      </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Filters Sidebar */}
-        <div className="w-full lg:w-64 space-y-6 bg-white p-6 rounded-2xl border border-slate-200 h-fit">
-          <div className="flex items-center gap-2 text-slate-900 font-semibold pb-4 border-b border-slate-100">
-            <SlidersHorizontal size={20} />
-            Filters
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Filters Sidebar */}
+          <div className="w-full lg:w-72 space-y-6 bg-white p-6 rounded-lg border border-zinc-200 h-fit">
+            <div className="flex items-center gap-2 text-zinc-900 font-semibold">
+              <SlidersHorizontal size={20} />
+              <span>Filters</span>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-zinc-700 mb-2 block">
+                  Search Location
+                </label>
+                <div className="relative">
+                  <Search
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                    size={18}
+                  />
+                  <input
+                    type="text"
+                    placeholder="City, Address..."
+                    value={searchLocation}
+                    onChange={(e) => setSearchLocation(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-zinc-700 mb-2 block">
+                  Price Range (MOVE)
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="number"
+                    placeholder="Min"
+                    value={minPrice}
+                    onChange={(e) => setMinPrice(e.target.value)}
+                    className="px-3 py-2.5 rounded-lg border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Max"
+                    value={maxPrice}
+                    onChange={(e) => setMaxPrice(e.target.value)}
+                    className="px-3 py-2.5 rounded-lg border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
+                  />
+                </div>
+              </div>
+
+              <Button
+                className="w-full"
+                onClick={loadProperties}
+                disabled={loading}
+                size="sm"
+              >
+                {loading ? "Refreshing..." : "Refresh Properties"}
+              </Button>
+            </div>
           </div>
 
-          <div className="space-y-4">
-            <Input
-              label="Search Location"
-              placeholder="City, Address..."
-              icon={Search}
-              value={searchLocation}
-              onChange={(e) => setSearchLocation(e.target.value)}
-            />
-
-            <div>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">
-                Price Range (MOVE)
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  placeholder="Min"
-                  type="number"
-                  value={minPrice}
-                  onChange={(e) => setMinPrice(e.target.value)}
-                />
-                <Input
-                  placeholder="Max"
-                  type="number"
-                  value={maxPrice}
-                  onChange={(e) => setMaxPrice(e.target.value)}
-                />
+          {/* Property Grid */}
+          <div className="flex-1">
+            {loading ? (
+              <div className="flex justify-center items-center py-20">
+                <Loader className="animate-spin text-teal-700" size={32} />
               </div>
-            </div>
+            ) : displayedProperties.length === 0 ? (
+              <div className="text-center py-20 bg-white rounded-lg border border-zinc-200">
+                <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Search size={32} className="text-zinc-400" />
+                </div>
+                <h3 className="text-lg font-medium text-zinc-900 mb-2">
+                  No properties found
+                </h3>
+                <p className="text-zinc-600 text-sm">
+                  Try adjusting your filters or check back later
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {displayedProperties.map((p) => (
+                    <PropertyCard key={p.id} property={p} />
+                  ))}
+                </div>
 
-            <Button
-              className="w-full"
-              onClick={loadProperties}
-              disabled={loading}
-            >
-              {loading ? "Refreshing..." : "Refresh Properties"}
-            </Button>
+                <div className="mt-8 text-center">
+                  <p className="text-sm text-zinc-600">
+                    Showing{" "}
+                    <span className="font-medium text-zinc-900">
+                      {displayedProperties.length}
+                    </span>{" "}
+                    of{" "}
+                    <span className="font-medium text-zinc-900">
+                      {properties.length}
+                    </span>{" "}
+                    properties
+                  </p>
+                </div>
+              </>
+            )}
           </div>
-        </div>
-
-        {/* Property Grid */}
-        <div className="flex-1">
-          {loading ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader className="animate-spin text-primary" size={32} />
-            </div>
-          ) : displayedProperties.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-slate-500 text-lg">No properties found</p>
-              <p className="text-slate-400 text-sm mt-2">
-                Try adjusting your filters or list a new property
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {displayedProperties.map((p) => (
-                  <PropertyCard key={p.id} property={p} />
-                ))}
-              </div>
-
-              <div className="mt-8 text-center text-sm text-slate-500">
-                Showing {displayedProperties.length} of {properties.length}{" "}
-                properties
-              </div>
-            </>
-          )}
         </div>
       </div>
     </div>

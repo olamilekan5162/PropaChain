@@ -1,8 +1,15 @@
-import { ArrowRight, ShieldCheck, Zap, Globe } from "lucide-react";
+import {
+  ArrowRight,
+  ShieldCheck,
+  Zap,
+  Globe,
+  Home,
+  TrendingUp,
+  Check,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/common/Button";
 import { PropertyCard } from "../components/common/PropertyCard";
-import { Footer } from "../components/layout/Footer";
 import { useState, useEffect } from "react";
 import WalletModal from "../components/wallet/WalletModal";
 import { useMovementWallet } from "../hooks/useMovementWallet";
@@ -16,176 +23,185 @@ export default function LandingPage() {
   const { fetchAllProperties } = useFetchProperties();
   const [featuredProperties, setFeaturedProperties] = useState([]);
 
-  useEffect(() => {
-    loadFeaturedProperties();
-  }, []);
-
   const loadFeaturedProperties = async () => {
     try {
       const props = await fetchAllProperties();
-      const formatted = props
-        .filter((p) => p.status === 1)
-        .slice(0, 3)
-        .map((p) => ({
-          id: p.id,
-          title: p.description
-            ? p.description.substring(0, 50) +
-              (p.description.length > 50 ? "..." : "")
-            : `Property #${p.id}`,
-          location: p.property_address || "Location not specified",
-          price: parseInt(p.price || 0) / 100_000_000,
-          image:
-            p.images_cids && p.images_cids.length > 0
-              ? `https://${GATEWAY_URL}/ipfs/${p.images_cids[0]}`
-              : "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800",
-          beds: 3,
-          baths: 2,
-          sqft: 2200,
-          status: "Available",
-        }));
-      setFeaturedProperties(formatted);
+      // Properties are already formatted by formatPropertyData()
+      const availableProps = props.filter((p) => p.status === 1).slice(0, 3);
+      setFeaturedProperties(availableProps);
     } catch (error) {
       console.error("Failed to load featured properties:", error);
       setFeaturedProperties([]);
     }
   };
 
+  useEffect(() => {
+    loadFeaturedProperties();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-slate-900 pt-32 pb-20 lg:pt-48 lg:pb-32">
-        {/* Background Elements */}
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
-          <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-accent/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] bg-primary/20 rounded-full blur-3xl" />
-        </div>
+      <section className="pt-20 pb-20 lg:pt-28 lg:pb-28 bg-zinc-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-teal-50 text-teal-700 text-sm font-medium mb-6">
+              <span className="w-2 h-2 rounded-full bg-teal-500"></span>
+              Live on Movement Mainnet
+            </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/50 border border-slate-700 text-accent text-sm font-medium mb-8 animate-fade-in-up">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
-            </span>
-            Live on Movement Mainnet
-          </div>
+            <h1 className="text-5xl md:text-6xl font-semibold text-zinc-900 mb-6 tracking-tight">
+              Modern Real Estate Trading Platform
+            </h1>
 
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white mb-8">
-            The Future of <br className="hidden md:block" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-emerald-400">
-              Real Estate Trading
-            </span>
-          </h1>
+            <p className="text-xl text-zinc-600 mb-10 leading-relaxed">
+              Buy, sell, and trade properties with blockchain technology.
+              Secure, transparent, and efficient real estate transactions
+              powered by Movement.
+            </p>
 
-          <p className="max-w-2xl mx-auto text-xl text-slate-400 mb-12">
-            Buy, rent, and trade properties with zero fees. Powered by Movement
-            blockchain for instant solidity and security.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/app/marketplace">
-              <Button
-                size="lg"
-                className="w-full sm:w-auto text-lg shadow-accent/25"
-              >
-                Explore Marketplace <ArrowRight className="ml-2" />
-              </Button>
-            </Link>
-            {!walletAddress ? (
-              <Button
-                variant="secondary"
-                size="lg"
-                className="w-full sm:w-auto text-lg border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:border-slate-600"
-                onClick={() => setShowWalletModal(true)}
-              >
-                Connect Wallet
-              </Button>
-            ) : (
-              <Link to="/app">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link to="/marketplace">
+                <Button size="lg" className="w-full sm:w-auto">
+                  Explore Properties <ArrowRight className="ml-2" size={20} />
+                </Button>
+              </Link>
+              {!walletAddress && (
                 <Button
                   variant="secondary"
                   size="lg"
-                  className="w-full sm:w-auto text-lg border-emerald-500/50 bg-emerald-900/20 text-emerald-400 hover:bg-emerald-900/30"
+                  className="w-full sm:w-auto"
+                  onClick={() => setShowWalletModal(true)}
                 >
-                  Go to Dashboard
+                  Connect Wallet
                 </Button>
-              </Link>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section className="py-24 bg-white">
+      {/* Stats Section */}
+      <section className="py-16 border-y border-zinc-200 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-3 gap-12">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             <div className="text-center">
-              <div className="w-16 h-16 mx-auto bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 mb-6">
-                <Zap size={32} />
+              <div className="text-3xl md:text-4xl font-semibold text-teal-700 mb-2">
+                $50M+
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-4">
+              <div className="text-sm text-zinc-600">Total Value Traded</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl md:text-4xl font-semibold text-teal-700 mb-2">
+                1,200+
+              </div>
+              <div className="text-sm text-zinc-600">Properties Listed</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl md:text-4xl font-semibold text-teal-700 mb-2">
+                500+
+              </div>
+              <div className="text-sm text-zinc-600">Active Users</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl md:text-4xl font-semibold text-teal-700 mb-2">
+                98%
+              </div>
+              <div className="text-sm text-zinc-600">Satisfaction Rate</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-semibold text-zinc-900 mb-4">
+              Why Choose PropaChain
+            </h2>
+            <p className="text-lg text-zinc-600 max-w-2xl mx-auto">
+              Experience the future of real estate with our blockchain-powered
+              platform
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="bg-white border border-zinc-200 rounded-lg p-8 hover:shadow-lg transition-shadow">
+              <div className="w-12 h-12 bg-teal-50 rounded-lg flex items-center justify-center mb-6">
+                <Zap className="w-6 h-6 text-teal-700" />
+              </div>
+              <h3 className="text-xl font-semibold text-zinc-900 mb-3">
                 Instant Transactions
               </h3>
-              <p className="text-slate-500">
-                Zero-fee transactions finalized in seconds using the MOVE
-                Tangle.
+              <p className="text-zinc-600 leading-relaxed">
+                Complete property transactions in seconds with zero fees using
+                Movement blockchain technology.
               </p>
             </div>
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mb-6">
-                <ShieldCheck size={32} />
+
+            <div className="bg-white border border-zinc-200 rounded-lg p-8 hover:shadow-lg transition-shadow">
+              <div className="w-12 h-12 bg-emerald-50 rounded-lg flex items-center justify-center mb-6">
+                <ShieldCheck className="w-6 h-6 text-emerald-700" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-4">
+              <h3 className="text-xl font-semibold text-zinc-900 mb-3">
                 Smart Escrow
               </h3>
-              <p className="text-slate-500">
-                Automated trustless escrow services for secure property
-                exchange.
+              <p className="text-zinc-600 leading-relaxed">
+                Automated and trustless escrow system ensures secure property
+                exchanges for all parties.
               </p>
             </div>
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600 mb-6">
-                <Globe size={32} />
+
+            <div className="bg-white border border-zinc-200 rounded-lg p-8 hover:shadow-lg transition-shadow">
+              <div className="w-12 h-12 bg-amber-50 rounded-lg flex items-center justify-center mb-6">
+                <Globe className="w-6 h-6 text-amber-700" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-4">
+              <h3 className="text-xl font-semibold text-zinc-900 mb-3">
                 Global Access
               </h3>
-              <p className="text-slate-500">
-                Trade real estate globally without intermediaries or borders.
+              <p className="text-zinc-600 leading-relaxed">
+                Trade real estate globally without intermediaries, borders, or
+                traditional banking limitations.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Featured Properties using Carousel Layout */}
-      <section className="py-24 bg-slate-50">
+      {/* Featured Properties */}
+      <section className="py-20 bg-zinc-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-end mb-12">
             <div>
-              <h2 className="text-3xl font-bold text-slate-900 mb-4">
+              <h2 className="text-3xl font-semibold text-zinc-900 mb-3">
                 Featured Properties
               </h2>
-              <p className="text-slate-500">
-                Exclusive listings available for immediate purchase.
+              <p className="text-zinc-600">
+                Explore our exclusive property listings
               </p>
             </div>
             <Link
-              to="/app/marketplace"
-              className="text-primary font-medium hover:text-accent transition-colors flex items-center"
+              to="/marketplace"
+              className="text-teal-700 font-medium hover:text-teal-800 transition-colors flex items-center gap-1"
             >
-              View All <ArrowRight size={16} className="ml-1" />
+              View All <ArrowRight size={18} />
             </Link>
           </div>
 
           {featuredProperties.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {featuredProperties.map((property) => (
                 <PropertyCard key={property.id} property={property} />
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 bg-white rounded-2xl border border-slate-200">
-              <p className="text-slate-500 mb-6">No properties available yet</p>
+            <div className="text-center py-16 bg-white rounded-lg border border-zinc-200">
+              <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Home className="w-8 h-8 text-zinc-400" />
+              </div>
+              <p className="text-zinc-600 mb-6">No properties available yet</p>
               <Link to="/app/upload">
                 <Button>List Your First Property</Button>
               </Link>
@@ -194,7 +210,100 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <Footer />
+      {/* How It Works */}
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-semibold text-zinc-900 mb-4">
+              How It Works
+            </h2>
+            <p className="text-lg text-zinc-600 max-w-2xl mx-auto">
+              Get started with PropaChain in three simple steps
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-teal-700 text-white rounded-full flex items-center justify-center text-2xl font-semibold mx-auto mb-6">
+                1
+              </div>
+              <h3 className="text-xl font-semibold text-zinc-900 mb-3">
+                Connect Wallet
+              </h3>
+              <p className="text-zinc-600">
+                Connect your Movement wallet to get started with secure property
+                trading
+              </p>
+            </div>
+            <div className="text-center">
+              <div className="w-16 h-16 bg-teal-700 text-white rounded-full flex items-center justify-center text-2xl font-semibold mx-auto mb-6">
+                2
+              </div>
+              <h3 className="text-xl font-semibold text-zinc-900 mb-3">
+                Browse Properties
+              </h3>
+              <p className="text-zinc-600">
+                Explore verified property listings with detailed information and
+                imagery
+              </p>
+            </div>
+            <div className="text-center">
+              <div className="w-16 h-16 bg-teal-700 text-white rounded-full flex items-center justify-center text-2xl font-semibold mx-auto mb-6">
+                3
+              </div>
+              <h3 className="text-xl font-semibold text-zinc-900 mb-3">
+                Make Transaction
+              </h3>
+              <p className="text-zinc-600">
+                Complete secure transactions using smart contracts and escrow
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-20 bg-teal-700">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl md:text-4xl font-semibold text-white mb-6">
+            Ready to Get Started?
+          </h2>
+          <p className="text-xl text-teal-50 mb-10">
+            Join thousands of users trading properties on the blockchain
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            {!walletAddress ? (
+              <>
+                <Button
+                  size="lg"
+                  variant="secondary"
+                  className="w-full sm:w-auto bg-white text-teal-700 hover:bg-teal-50"
+                  onClick={() => setShowWalletModal(true)}
+                >
+                  Connect Wallet
+                </Button>
+                <Link to="/marketplace">
+                  <Button
+                    size="lg"
+                    className="w-full sm:w-auto bg-teal-800 hover:bg-teal-900 border-teal-800"
+                  >
+                    View Marketplace <ArrowRight className="ml-2" size={20} />
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <Link to="/app">
+                <Button
+                  size="lg"
+                  className="bg-white text-teal-700 hover:bg-teal-50 border-white"
+                >
+                  Go to Dashboard <ArrowRight className="ml-2" size={20} />
+                </Button>
+              </Link>
+            )}
+          </div>
+        </div>
+      </section>
 
       <WalletModal
         isOpen={showWalletModal}

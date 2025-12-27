@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import DashboardLayout from "./components/layout/DashboardLayout";
+import PublicLayout from "./components/layout/PublicLayout";
 import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
 import Marketplace from "./pages/Marketplace";
@@ -15,15 +16,20 @@ function App() {
     <Router>
       <RegistrationGuard>
         <Routes>
-          <Route path="/" element={<LandingPage />} />
+          {/* Public Routes with Header Navigation */}
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/property/:id" element={<PropertyDetails />} />
+          </Route>
+
+          {/* Authenticated Routes with Sidebar Navigation */}
           <Route path="/app" element={<DashboardLayout />}>
             <Route index element={<Dashboard />} />
-            <Route path="marketplace" element={<Marketplace />} />
             <Route path="my-properties" element={<MyProperties />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="upload" element={<UploadPage />} />
             <Route path="profile" element={<Profile />} />
-            <Route path="property/:id" element={<PropertyDetails />} />
           </Route>
         </Routes>
       </RegistrationGuard>

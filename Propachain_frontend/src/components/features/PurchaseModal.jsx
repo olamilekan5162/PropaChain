@@ -23,10 +23,8 @@ const STEPS = {
 export const PurchaseModal = ({ isOpen, onClose, property }) => {
   const [step, setStep] = useState(STEPS.REVIEW);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [receipt, setReceipt] = useState(null);
   const [escrowId, setEscrowId] = useState(null);
   const { depositToEscrow } = usePropertyOperations();
-  const { getEscrowReceipt, formatReceipt, getReceiptStatus } = useReceipts();
   const { walletAddress } = useMovementWallet();
 
   // Reset state when opening
@@ -49,34 +47,24 @@ export const PurchaseModal = ({ isOpen, onClose, property }) => {
       // property.price is displayed in MOVE (formatted), we need octas
       const rawPrice = Math.round(property.price * 100_000_000);
 
-      const success = await depositToEscrow(toastId, property.id, rawPrice, property.documents_cid?.vec[0]);
+      const success = await depositToEscrow(
+        toastId,
+        property.id,
+        rawPrice,
+        property.documents_cid?.vec[0]
+      );
 
       if (success) {
-        // After successful deposit, fetch the receipt
-        // The escrow ID would be returned from the transaction or we need to track it
-        try {
-          // Note: You may need to extract escrowId from the transaction response
-          // For now, we'll set a placeholder that would be updated with actual escrow ID
-          toast.dismiss(toastId);
-          toast.loading("Generating receipt...");
+        // Transaction successful - escrow created and receipts minted automatically
+        toast.dismiss(toastId);
+        toast.success("Purchase successful!");
 
-          // This would be the actual escrow ID from the transaction
-          // You might need to parse it from the transaction result
-          if (success && success.escrow_id) {
-            const receiptData = await getEscrowReceipt(success.escrow_id);
-            setReceipt(formatReceipt(receiptData));
-            setEscrowId(success.escrow_id);
-          }
-
-          setStep(STEPS.SUCCESS);
-          toast.dismiss(toastId);
-          toast.success("Receipt generated successfully!");
-        } catch (err) {
-          console.error("Error fetching receipt:", err);
-          // Still show success even if receipt fetch fails
-          setStep(STEPS.SUCCESS);
-          toast.dismiss(toastId);
+        // Extract escrow ID from success response if available
+        if (success && success.escrow_id) {
+          setEscrowId(success.escrow_id);
         }
+
+        setStep(STEPS.SUCCESS);
       }
     } catch (error) {
       console.error("Failed to purchase property:", error);
@@ -89,23 +77,28 @@ export const PurchaseModal = ({ isOpen, onClose, property }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+        className="bg-white rounded-lg shadow-2xl w-full max-w-lg overflow-hidden"
       >
         {/* Header */}
-        <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-          <h2 className="text-lg font-bold text-slate-900">
-            {step === STEPS.SUCCESS
-              ? "Purchase Successful"
-              : "Complete Purchase"}
-          </h2>
+        <div className="px-6 py-5 border-b border-zinc-200 flex justify-between items-center bg-gradient-to-r from-teal-50 to-teal-50/50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-teal-700 rounded-lg flex items-center justify-center">
+              <ShieldCheck className="text-white" size={20} />
+            </div>
+            <h2 className="text-lg font-semibold text-zinc-900">
+              {step === STEPS.SUCCESS
+                ? "Purchase Confirmed"
+                : "Complete Purchase"}
+            </h2>
+          </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600"
+            className="text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 p-2 rounded-lg transition-colors"
           >
             <X size={20} />
           </button>
@@ -114,12 +107,12 @@ export const PurchaseModal = ({ isOpen, onClose, property }) => {
         {/* Content */}
         <div className="p-6">
           {/* Progress Bar */}
-          <div className="flex gap-2 mb-8">
+          <div className="flex gap-2 mb-6">
             {[0, 1].map((s) => (
               <div
                 key={s}
-                className={`h-1 flex-1 rounded-full transition-colors duration-300 ${
-                  s <= step ? "bg-primary" : "bg-slate-100"
+                className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
+                  s <= step ? "bg-teal-700" : "bg-zinc-200"
                 }`}
               />
             ))}
@@ -132,66 +125,108 @@ export const PurchaseModal = ({ isOpen, onClose, property }) => {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="space-y-4"
+                className="space-y-5"
               >
-                <div className="flex gap-4 p-4 bg-slate-50 rounded-xl">
+                {/* Property Card */}
+                <div className="flex gap-4 p-4 bg-zinc-50 rounded-lg border border-zinc-200">
                   <img
                     src={property.images[0]}
                     alt=""
-                    className="w-20 h-20 object-cover rounded-lg"
+                    className="w-24 h-24 object-cover rounded-lg shrink-0"
                     onError={(e) => {
                       e.target.src =
                         "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800";
                     }}
                   />
-                  <div>
-                    <h3 className="font-bold text-slate-900">
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-zinc-900 text-base mb-1 truncate">
                       {property.title}
                     </h3>
-                    <p className="text-sm text-slate-500 truncate max-w-[200px]">
+                    <p className="text-sm text-zinc-600 truncate">
                       {property.location}
                     </p>
-                    <p className="text-primary font-bold mt-1">
+                    <p className="text-teal-700 font-bold text-lg mt-2">
                       {property.price.toLocaleString()} MOVE
                     </p>
                   </div>
                 </div>
 
-                <div className="space-y-2 text-sm text-slate-600">
-                  <div className="flex justify-between">
-                    <span>Property Price</span>
-                    <span>{property.price.toLocaleString()} MOVE</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Platform Fee (0%)</span>
-                    <span className="text-emerald-500">FREE</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Network Fee</span>
-                    <span>~ 0.001 MOVE</span>
-                  </div>
-                  <div className="pt-2 border-t border-slate-100 flex justify-between font-bold text-slate-900 text-base">
-                    <span>Total</span>
-                    <span>{property.price.toLocaleString()} MOVE</span>
+                {/* Price Breakdown */}
+                <div className="bg-zinc-50 rounded-lg border border-zinc-200 p-4 space-y-3">
+                  <h4 className="font-semibold text-zinc-900 text-sm">
+                    Price Breakdown
+                  </h4>
+                  <div className="space-y-2.5 text-sm">
+                    <div className="flex justify-between text-zinc-700">
+                      <span>Property Price</span>
+                      <span className="font-medium">
+                        {property.price.toLocaleString()} MOVE
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-zinc-700">
+                      <span>Platform Fee</span>
+                      <span className="font-medium text-teal-700">
+                        FREE (0%)
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-zinc-700">
+                      <span>Network Fee (est.)</span>
+                      <span className="font-medium">~0.001 MOVE</span>
+                    </div>
+                    <div className="pt-3 border-t border-zinc-300 flex justify-between font-semibold text-zinc-900">
+                      <span>Total Amount</span>
+                      <span className="text-teal-700">
+                        {property.price.toLocaleString()} MOVE
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="p-3 bg-blue-50 text-blue-700 text-xs rounded-lg">
-                  <p className="font-semibold mb-1">Escrow Process:</p>
-                  <ul className="list-disc pl-4 space-y-1">
-                    <li>Funds will be locked in a secure smart contract.</li>
-                    <li>
-                      Ownership NFT is minted only upon successful transfer.
+                {/* Escrow Info */}
+                <div className="p-4 bg-teal-50 rounded-lg border border-teal-200">
+                  <div className="flex gap-3 mb-3">
+                    <div className="w-8 h-8 bg-teal-700 rounded-lg flex items-center justify-center shrink-0">
+                      <ShieldCheck className="text-white" size={16} />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-teal-900 text-sm">
+                        Secure Escrow Protection
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="text-xs text-teal-800 space-y-1.5 pl-11">
+                    <li className="flex items-start gap-2">
+                      <CheckCircle size={14} className="mt-0.5 shrink-0" />
+                      <span>Funds locked in secure smart contract</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle size={14} className="mt-0.5 shrink-0" />
+                      <span>Ownership NFT minted upon confirmation</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckCircle size={14} className="mt-0.5 shrink-0" />
+                      <span>Both parties must confirm to complete</span>
                     </li>
                   </ul>
                 </div>
 
                 <Button
-                  className="w-full mt-4"
+                  className="w-full bg-teal-700 hover:bg-teal-800"
                   onClick={handleCreateEscrow}
                   isLoading={isProcessing}
+                  disabled={isProcessing}
                 >
-                  Confirm Purchase
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 animate-spin" size={18} />
+                      Processing Transaction...
+                    </>
+                  ) : (
+                    <>
+                      Confirm Purchase
+                      <ArrowRight className="ml-2" size={18} />
+                    </>
+                  )}
                 </Button>
               </motion.div>
             )}
@@ -201,103 +236,118 @@ export const PurchaseModal = ({ isOpen, onClose, property }) => {
                 key="success"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="text-center space-y-6"
+                className="text-center space-y-5"
               >
-                <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto ring-8 ring-emerald-50">
-                  <CheckCircle size={40} />
+                {/* Success Icon */}
+                <div className="w-20 h-20 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-teal-700/20">
+                  <CheckCircle size={40} strokeWidth={2.5} />
                 </div>
+
+                {/* Success Message */}
                 <div>
-                  <h3 className="text-2xl font-bold text-slate-900 mb-2">
-                    Purchase Complete!
+                  <h3 className="text-2xl font-semibold text-zinc-900 mb-2">
+                    Purchase Successful!
                   </h3>
-                  <p className="text-slate-500">
+                  <p className="text-zinc-600 leading-relaxed">
                     Your escrow transaction has been initiated successfully.
+                    <br />
+                    Both parties will need to confirm to complete the transfer.
                   </p>
                 </div>
 
-                {/* Receipt Details */}
-                {receipt ? (
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-left space-y-3">
-                    <div className="flex items-center gap-3">
-                      <FileText className="text-primary" size={20} />
-                      <span className="font-semibold text-slate-900">
-                        Transaction Receipt
+                {/* Transaction Details */}
+                <div className="bg-zinc-50 p-5 rounded-lg border border-zinc-200 text-left">
+                  <div className="flex items-center gap-3 mb-4 pb-3 border-b border-zinc-200">
+                    <div className="w-9 h-9 bg-teal-700 rounded-lg flex items-center justify-center">
+                      <ShieldCheck className="text-white" size={18} />
+                    </div>
+                    <span className="font-semibold text-zinc-900">
+                      Escrow Created
+                    </span>
+                  </div>
+
+                  <div className="space-y-2.5 text-sm">
+                    {escrowId && (
+                      <div className="flex justify-between">
+                        <span className="text-zinc-600">Escrow ID</span>
+                        <span className="font-mono text-zinc-900 text-xs bg-zinc-100 px-2 py-1 rounded">
+                          #{escrowId}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-zinc-600">Amount</span>
+                      <span className="font-semibold text-teal-700">
+                        {property.price.toLocaleString()} MOVE
                       </span>
                     </div>
-
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">Escrow ID:</span>
-                        <span className="font-mono text-slate-900 text-xs">
-                          {escrowId}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">Amount:</span>
-                        <span className="font-bold text-slate-900">
-                          {receipt.formattedAmount} MOVE
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">Property:</span>
-                        <span className="text-slate-900">
-                          {receipt.property_type}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">Type:</span>
-                        <span className="text-slate-900">
-                          {receipt.listingType}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">Date:</span>
-                        <span className="text-slate-900">
-                          {receipt.formattedDate}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">Status:</span>
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-semibold ${
-                            getReceiptStatus(receipt).color
-                          }`}
-                        >
-                          {getReceiptStatus(receipt).status}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                    <div className="flex items-center gap-3">
-                      <FileText className="text-blue-600" size={20} />
-                      <span className="font-semibold text-blue-900">
-                        Receipt NFT
+                    <div className="flex justify-between">
+                      <span className="text-zinc-600">Property</span>
+                      <span className="text-zinc-900 font-medium">
+                        {property.title}
                       </span>
                     </div>
-                    <p className="text-xs text-blue-700 mt-2 pl-8">
-                      Your transaction receipt has been recorded on the
-                      blockchain.
-                    </p>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-600">Type</span>
+                      <span className="text-zinc-900 font-medium">
+                        {property.listingType === 1 ? "Sale" : "Rent"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-zinc-600">Status</span>
+                      <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-100 text-amber-700">
+                        In Escrow
+                      </span>
+                    </div>
                   </div>
-                )}
+                </div>
 
-                <div className="p-3 bg-amber-50 text-amber-700 text-xs rounded-lg">
-                  <p className="font-semibold mb-1">Next Steps:</p>
-                  <ul className="list-disc pl-4 space-y-1">
-                    <li>Seller will confirm receipt of payment</li>
-                    <li>Once confirmed, ownership will transfer to you</li>
-                    <li>You can track this transaction in your profile</li>
+                {/* Receipt NFT Info */}
+                <div className="bg-teal-50 p-4 rounded-lg border border-teal-200">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 bg-teal-700 rounded-lg flex items-center justify-center">
+                      <FileText className="text-white" size={16} />
+                    </div>
+                    <span className="font-semibold text-teal-900">
+                      Receipt NFT Minted
+                    </span>
+                  </div>
+                  <p className="text-xs text-teal-700 leading-relaxed pl-11">
+                    Your transaction receipt NFT has been automatically minted
+                    and is available in your profile.
+                  </p>
+                </div>
+
+                {/* Next Steps */}
+                <div className="p-4 bg-amber-50 rounded-lg border border-amber-200 text-left">
+                  <p className="font-semibold text-amber-900 text-sm mb-2">
+                    Next Steps
+                  </p>
+                  <ul className="text-xs text-amber-800 space-y-1.5">
+                    <li className="flex items-start gap-2">
+                      <ArrowRight size={14} className="mt-0.5 shrink-0" />
+                      <span>Seller will confirm receipt of payment</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ArrowRight size={14} className="mt-0.5 shrink-0" />
+                      <span>Once confirmed, ownership transfers to you</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ArrowRight size={14} className="mt-0.5 shrink-0" />
+                      <span>
+                        Track transaction status in your Transactions page
+                      </span>
+                    </li>
                   </ul>
                 </div>
 
-                <div className="space-y-3">
-                  <Button variant="secondary" className="w-full">
-                    <Download size={16} className="mr-2" /> Download Receipt
-                  </Button>
-                  <Button className="w-full" onClick={onClose}>
-                    Close
+                {/* Action Buttons */}
+                <div className="space-y-2.5 pt-2">
+                  <Button
+                    className="w-full bg-teal-700 hover:bg-teal-800"
+                    onClick={onClose}
+                  >
+                    Done
                   </Button>
                 </div>
               </motion.div>

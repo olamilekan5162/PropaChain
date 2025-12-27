@@ -11,6 +11,7 @@ import {
   UploadCloud,
   FileText,
   ArrowLeftRight,
+  Search,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { clsx } from "clsx";
@@ -32,19 +33,14 @@ const SidebarLink = ({ to, icon: Icon, children }) => {
     <Link
       to={to}
       className={cn(
-        "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group",
+        "flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 text-sm font-medium",
         isActive
-          ? "bg-primary text-white shadow-lg shadow-primary/20"
-          : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+          ? "bg-teal-50 text-teal-700 border border-teal-200"
+          : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
       )}
     >
-      <Icon
-        size={20}
-        className={cn(
-          isActive ? "text-accent" : "text-slate-400 group-hover:text-primary"
-        )}
-      />
-      <span className="font-medium">{children}</span>
+      <Icon size={20} />
+      <span>{children}</span>
     </Link>
   );
 };
@@ -58,9 +54,6 @@ export default function DashboardLayout() {
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
-
-  const isPrivyWallet = authenticated;
-  // const isNativeWallet = connected && !authenticated; // Logic mirrored from header.jsx reference
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -79,14 +72,12 @@ export default function DashboardLayout() {
 
   const handleDisconnect = async () => {
     try {
-      // Logic handled via disconnectWallet wrapper in useMovementWallet really,
-      // but following user reference logic for explicit logout calls if needed.
       if (authenticated) {
         await privyLogout();
       } else if (connected) {
         await nativeDisconnect();
       }
-      disconnectWallet(); // Ensure local state clear
+      disconnectWallet();
       setShowDropdown(false);
       navigate("/");
     } catch (error) {
@@ -95,25 +86,25 @@ export default function DashboardLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-zinc-50 flex">
       {/* Sidebar - Desktop */}
-      <aside className="hidden lg:flex w-64 bg-white border-r border-slate-200 flex-col fixed h-full z-10">
-        <div className="p-6 border-b border-slate-100">
-          <Link to="/">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+      <aside className="hidden lg:flex w-64 bg-white border-r border-zinc-200 flex-col fixed h-full z-10">
+        {/* Logo */}
+        <div className="p-6 border-b border-zinc-100">
+          <Link to="/" className="flex items-center gap-2">
+            <Home className="w-7 h-7 text-teal-700" />
+            <span className="text-xl font-semibold text-zinc-900">
               PropaChain
-            </h1>
+            </span>
           </Link>
         </div>
 
+        {/* Navigation */}
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           <SidebarLink to="/app" icon={Home}>
             Dashboard
           </SidebarLink>
-          <SidebarLink to="/app/marketplace" icon={Building2}>
-            Marketplace
-          </SidebarLink>
-          <SidebarLink to="/app/my-properties" icon={FileText}>
+          <SidebarLink to="/app/my-properties" icon={Building2}>
             My Properties
           </SidebarLink>
           <SidebarLink to="/app/transactions" icon={ArrowLeftRight}>
@@ -127,43 +118,47 @@ export default function DashboardLayout() {
           </SidebarLink>
         </nav>
 
-        <div className="p-4 border-t border-slate-100">
+        {/* Wallet Section */}
+        <div className="p-4 border-t border-zinc-100">
           {!walletAddress ? (
             <Button className="w-full" onClick={() => setShowWalletModal(true)}>
               Connect Wallet
             </Button>
           ) : (
-            <div
-              className="bg-slate-50 p-4 rounded-xl border border-slate-100 relative"
-              ref={dropdownRef}
-            >
-              <div
-                className="flex items-center gap-3 cursor-pointer"
+            <div className="relative" ref={dropdownRef}>
+              <button
                 onClick={() => setShowDropdown(!showDropdown)}
+                className="w-full bg-zinc-50 hover:bg-zinc-100 p-3 rounded-lg border border-zinc-200 transition-colors"
               >
-                <div className="w-8 h-8 rounded-full border border-slate-200 overflow-hidden bg-white flex items-center justify-center">
-                  <Jazzicon
-                    diameter={32}
-                    seed={parseInt(walletAddress.slice(2, 10), 16)}
-                  />
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full border border-zinc-200 overflow-hidden bg-white flex items-center justify-center">
+                    <Jazzicon
+                      diameter={32}
+                      seed={parseInt(walletAddress.slice(2, 10), 16)}
+                    />
+                  </div>
+                  <div className="flex-1 text-left overflow-hidden">
+                    <p className="text-xs text-zinc-500">Connected</p>
+                    <p className="text-sm font-mono text-zinc-900 truncate">
+                      {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-1 overflow-hidden">
-                  <p className="text-xs text-slate-500">Connected</p>
-                  <p className="text-sm font-mono text-slate-700 truncate">
-                    {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-                  </p>
-                </div>
-              </div>
+              </button>
 
               {/* Dropdown */}
               {showDropdown && (
-                <div className="absolute bottom-full left-0 mb-2 w-full bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-50">
-                  <button className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center gap-2 text-sm text-slate-600">
+                <div className="absolute bottom-full left-0 mb-2 w-full bg-white rounded-lg shadow-lg border border-zinc-200 overflow-hidden">
+                  <Link
+                    to="/app/profile"
+                    className="w-full text-left px-4 py-3 hover:bg-zinc-50 flex items-center gap-2 text-sm text-zinc-700"
+                    onClick={() => setShowDropdown(false)}
+                  >
                     <User size={16} /> Profile
-                  </button>
+                  </Link>
                   <button
                     onClick={handleDisconnect}
-                    className="w-full text-left px-4 py-3 hover:bg-red-50 text-red-600 flex items-center gap-2 text-sm border-t border-slate-50"
+                    className="w-full text-left px-4 py-3 hover:bg-red-50 text-red-600 flex items-center gap-2 text-sm border-t border-zinc-100"
                   >
                     <LogOut size={16} /> Disconnect
                   </button>
@@ -175,19 +170,67 @@ export default function DashboardLayout() {
       </aside>
 
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 w-full bg-white border-b border-slate-200 z-20 p-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-primary">PropATradeX</h1>
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 text-slate-600"
-        >
-          {isMobileMenuOpen ? <X /> : <Menu />}
-        </button>
+      <div className="lg:hidden fixed top-0 w-full bg-white border-b border-zinc-200 z-20">
+        <div className="flex items-center justify-between p-4">
+          <Link to="/" className="flex items-center gap-2">
+            <Home className="w-6 h-6 text-teal-700" />
+            <span className="text-lg font-semibold text-zinc-900">
+              PropaChain
+            </span>
+          </Link>
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-2 text-zinc-600 hover:text-zinc-900"
+          >
+            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
+
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+          <div className="border-t border-zinc-200 bg-white p-4 space-y-1">
+            <SidebarLink to="/app" icon={Home}>
+              Dashboard
+            </SidebarLink>
+            <SidebarLink to="/app/my-properties" icon={Building2}>
+              My Properties
+            </SidebarLink>
+            <SidebarLink to="/app/transactions" icon={ArrowLeftRight}>
+              Transactions
+            </SidebarLink>
+            <SidebarLink to="/app/upload" icon={UploadCloud}>
+              List Property
+            </SidebarLink>
+            <SidebarLink to="/app/profile" icon={User}>
+              Profile
+            </SidebarLink>
+
+            <div className="pt-4 border-t border-zinc-100">
+              {!walletAddress ? (
+                <Button
+                  className="w-full"
+                  onClick={() => setShowWalletModal(true)}
+                >
+                  Connect Wallet
+                </Button>
+              ) : (
+                <button
+                  onClick={handleDisconnect}
+                  className="w-full px-4 py-2.5 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100"
+                >
+                  Disconnect Wallet
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 lg:ml-64 p-4 lg:p-8 pt-20 lg:pt-8 transition-all">
-        <Outlet />
+      <main className="flex-1 lg:ml-64 min-h-screen">
+        <div className="p-4 sm:p-6 lg:p-6 pt-20 lg:pt-6">
+          <Outlet />
+        </div>
       </main>
 
       <WalletModal

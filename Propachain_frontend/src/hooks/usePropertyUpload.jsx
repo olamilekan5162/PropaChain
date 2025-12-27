@@ -123,9 +123,7 @@ export const usePropertyUpload = () => {
             // Option<u64> for rental_period_months
             rentalPeriodMonths ? rentalPeriodMonths : 0,
             // Option<u64> for deposit_required
-            depositRequired
-              ? Math.floor(depositRequired * 100_000_000)
-              : 0,
+            depositRequired ? Math.floor(depositRequired * 100_000_000) : 0,
           ],
         },
       };
@@ -137,7 +135,7 @@ export const usePropertyUpload = () => {
       console.log("Upload successful:", result);
 
       // Navigate to profile after successful upload
-      setTimeout(() => navigate(`/profile/${walletAddress}`), 1500);
+      setTimeout(() => navigate(`/profile`), 1500);
 
       return true;
     } catch (error) {

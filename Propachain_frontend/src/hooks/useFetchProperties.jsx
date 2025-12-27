@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { aptos } from "../config/movement";
 import { MOVEMENT_CONTRACT_ADDRESS } from "../config/constants";
+import { addressesEqual, formatPropertyData } from "../utils/helper";
 import toast from "react-hot-toast";
 
 export const useFetchProperties = () => {
@@ -12,52 +13,60 @@ export const useFetchProperties = () => {
     setLoading(true);
     setError(null);
     try {
+      // Method 1: Get account resource to access the PropertyListingsStore
+      const resource = await aptos.getAccountResource({
+        accountAddress: MOVEMENT_CONTRACT_ADDRESS,
+        resourceType: `${MOVEMENT_CONTRACT_ADDRESS}::propachain::PropertyListingsStore`,
+      });
+
+      // The resource contains the SimpleMap handle and next_id
+      const { next_id } = resource;
+
+      console.log(`Total properties to fetch: ${next_id - 1}`);
+
+      // Method 2: Fetch properties in batches using Promise.all for better performance
       const allProperties = [];
+      const batchSize = 10; // Fetch 10 properties at a time
+      const totalProperties = parseInt(next_id) - 1;
 
-      // First, get the number of properties by querying the next_id
-      // We'll try fetching properties one by one until we get an error
-      // This is a workaround since the contract doesn't expose a get_all_properties function
-
-      // Start from property ID 1 (assuming IDs start at 1)
-      let propertyId = 1;
-      let foundProperties = 0;
-      const maxAttempts = 1000; // Safety limit
-
-      while (foundProperties < maxAttempts) {
-        try {
-          // Call the view function to get property details
-          const property = await aptos.view({
-            payload: {
-              function: `${MOVEMENT_CONTRACT_ADDRESS}::propachain::get_property`,
-              functionArguments: [MOVEMENT_CONTRACT_ADDRESS, propertyId],
-              typeArguments: [],
-            },
-          });
-
-          if (property && property[0]) {
-            // Property exists
-            allProperties.push({
-              id: propertyId,
-              ...property[0],
-            });
-            propertyId++;
-          } else {
-            // Property doesn't exist, stop searching
-            break;
-          }
-        } catch (err) {
-          // This property ID doesn't exist, try moving forward
-          // Or we've reached the end
-          if (allProperties.length === 0) {
-            // No properties found at all
-            break;
-          }
-          // We might have found all properties
-          break;
+      for (let i = 1; i <= totalProperties; i += batchSize) {
+        const batch = [];
+        for (let j = i; j < i + batchSize && j <= totalProperties; j++) {
+          batch.push(
+            aptos
+              .view({
+                payload: {
+                  function: `${MOVEMENT_CONTRACT_ADDRESS}::propachain::get_property`,
+                  functionArguments: [MOVEMENT_CONTRACT_ADDRESS, j],
+                  typeArguments: [],
+                },
+              })
+              .catch((err) => {
+                console.warn(`Failed to fetch property ${j}:`, err);
+                return null;
+              })
+          );
         }
-      }
-      console.log(allProperties);
 
+        // Wait for batch to complete
+        const batchResults = await Promise.all(batch);
+
+        // Add valid properties to the list with formatting
+        batchResults.forEach((result, index) => {
+          if (result && result[0]) {
+            const rawProperty = {
+              id: i + index,
+              ...result[0],
+            };
+            const formattedProperty = formatPropertyData(rawProperty);
+            if (formattedProperty) {
+              allProperties.push(formattedProperty);
+            }
+          }
+        });
+      }
+
+      console.log(`Successfully fetched ${allProperties.length} properties`);
       setProperties(allProperties);
       return allProperties;
     } catch (err) {
@@ -81,7 +90,11 @@ export const useFetchProperties = () => {
         },
       });
 
-      return property[0];
+      if (property && property[0]) {
+        const rawProperty = { id: propertyId, ...property[0] };
+        return formatPropertyData(rawProperty);
+      }
+      return null;
     } catch (err) {
       const errorMessage = `Failed to fetch property ${propertyId}`;
       console.error(errorMessage, err);
@@ -92,8 +105,8 @@ export const useFetchProperties = () => {
   const fetchPropertiesByOwner = async (ownerAddress) => {
     try {
       const allProperties = await fetchAllProperties();
-      const ownerProperties = allProperties.filter(
-        (prop) => prop.owner === ownerAddress
+      const ownerProperties = allProperties.filter((prop) =>
+        addressesEqual(prop.owner, ownerAddress)
       );
       return ownerProperties;
     } catch (err) {

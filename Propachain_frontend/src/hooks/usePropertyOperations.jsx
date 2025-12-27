@@ -246,6 +246,13 @@ export const usePropertyOperations = () => {
 
   const getConfirmationStatus = async (escrowId) => {
     try {
+      if (!escrowId) {
+        return {
+          buyerConfirmed: false,
+          sellerConfirmed: false,
+        };
+      }
+
       const status = await aptos.view({
         payload: {
           function: `${MOVEMENT_CONTRACT_ADDRESS}::propachain::get_confirmation_status`,
