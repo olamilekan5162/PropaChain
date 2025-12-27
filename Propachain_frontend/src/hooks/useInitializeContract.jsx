@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useMovementWallet } from "./useMovementWallet";
 
 const CONTRACT_ADDRESS =
-  "0x51bc1ceb0077177745b3de049c63bcfbb189c7a436829c6d1391b116cdc2fac5";
+  "0xd29827b0d1e7a077e595b903a49127190a7a73036d3a396a529eb7e52c4c9f20";
 
 // Dummy backend public key for testing (32 bytes)
 const DUMMY_PUBLIC_KEY = new Array(32).fill(0);

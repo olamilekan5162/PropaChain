@@ -7,6 +7,7 @@ module propachain::propachain {
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::event;
     use aptos_framework::timestamp;
+
     use aptos_std::table::{Self, Table};
     use aptos_std::simple_map::{Self, SimpleMap};
 
@@ -23,6 +24,7 @@ module propachain::propachain {
     const E_DISPUTE_RAISED: u64 = 10;
     const E_PROFILE_NOT_FOUND: u64 = 11;
     const E_NOT_IN_ESCROW: u64 = 12;
+    const E_RECEIPT_NOT_FOUND: u64 = 13;
 
     // ==================== Listing Type Constants ====================
     const LISTING_TYPE_SALE: u8 = 1;
@@ -70,7 +72,7 @@ module propachain::propachain {
         listing_type: u8, // 1 = Sale, 2 = Rent
         
         // Pricing
-        price: u64, // Sale price OR total rental amount
+        price: u64, // Sale price OR total rental amount (monthly_rent * months + deposit)
         monthly_rent: Option<u64>, // Only for rent
         rental_period_months: Option<u64>, // Only for rent
         deposit_required: Option<u64>, // Only for rent
@@ -124,7 +126,7 @@ module propachain::propachain {
         dispute_raised_by: Option<address>,
         dispute_reason: String,
         
-        // Receipt NFTs (for future implementation)
+        // Receipt NFTs
         buyer_renter_receipt_id: Option<u64>,
         seller_landlord_receipt_id: Option<u64>,
         
@@ -138,8 +140,14 @@ module propachain::propachain {
         funds: SimpleMap<u64, Coin<AptosCoin>>,
     }
 
+    /// Receipt Storage
+    struct ReceiptStore has key {
+        receipts: SimpleMap<u64, PropertyReceipt>,
+        next_id: u64,
+    }
+
     /// Property Receipt NFT
-    struct PropertyReceipt has key, store, drop, copy {
+    struct PropertyReceipt has store, drop, copy {
         id: u64,
         listing_type: u8,
         timestamp: u64,
@@ -164,6 +172,11 @@ module propachain::propachain {
         
         // Metadata
         metadata_uri: String,
+    }
+
+    /// User Receipt Ownership Tracking
+    struct UserReceipts has key {
+        receipt_ids: vector<u64>,
     }
 
     // ==================== Events ====================
@@ -281,6 +294,12 @@ module propachain::propachain {
         move_to(account, EscrowFunds {
             funds: simple_map::create(),
         });
+
+        // Initialize receipt store
+        move_to(account, ReceiptStore {
+            receipts: simple_map::create(),
+            next_id: 1,
+        });
     }
 
     // ==================== User Management Functions ====================
@@ -317,6 +336,13 @@ module propachain::propachain {
         });
 
         table::add(&mut registry.profiles, user_address, profile);
+
+        // Initialize user receipts if not exists
+        if (!exists<UserReceipts>(user_address)) {
+            move_to(account, UserReceipts {
+                receipt_ids: vector::empty(),
+            });
+        };
     }
 
     // ==================== Property Listing Functions ====================
@@ -384,9 +410,11 @@ module propachain::propachain {
         account: &signer,
         store_addr: address,
         escrow_store_addr: address,
+        receipt_store_addr: address,
         property_id: u64,
         payment_amount: u64,
-    ) acquires PropertyListingsStore, EscrowStore, EscrowFunds {
+        metadata_uri: String,
+    ) acquires PropertyListingsStore, EscrowStore, EscrowFunds, ReceiptStore, UserReceipts {
         let buyer_renter = signer::address_of(account);
         
         let property_store = borrow_global_mut<PropertyListingsStore>(store_addr);
@@ -412,6 +440,30 @@ module propachain::propachain {
         let escrow_id = escrow_store.next_id;
         escrow_store.next_id = escrow_store.next_id + 1;
 
+        let current_time = timestamp::now_seconds();
+
+        // Create receipts for both parties
+        let (buyer_receipt_id, seller_receipt_id) = create_receipts(
+            receipt_store_addr,
+            property.listing_type,
+            property_id,
+            property.property_address,
+            property.property_type,
+            buyer_renter,
+            property.owner,
+            payment_amount,
+            option::none(),
+            option::none(),
+            property.rental_period_months,
+            property.monthly_rent,
+            metadata_uri,
+            current_time,
+        );
+
+        // Track receipts for users
+        track_user_receipt(buyer_renter, buyer_receipt_id);
+        track_user_receipt(property.owner, seller_receipt_id);
+
         let escrow = Escrow {
             id: escrow_id,
             listing_type: property.listing_type,
@@ -424,10 +476,10 @@ module propachain::propachain {
             dispute_raised: false,
             dispute_raised_by: option::none(),
             dispute_reason: string::utf8(b""),
-            buyer_renter_receipt_id: option::none(),
-            seller_landlord_receipt_id: option::none(),
+            buyer_renter_receipt_id: option::some(buyer_receipt_id),
+            seller_landlord_receipt_id: option::some(seller_receipt_id),
             resolved: false,
-            created_at: timestamp::now_seconds(),
+            created_at: current_time,
         };
 
         property.escrow_id = option::some(escrow_id);
@@ -454,7 +506,7 @@ module propachain::propachain {
         escrow_store_addr: address,
         property_store_addr: address,
         escrow_id: u64,
-    ) acquires EscrowStore, PropertyListingsStore, EscrowFunds {
+    ) acquires EscrowStore, PropertyListingsStore, EscrowFunds, ReceiptStore {
         let caller = signer::address_of(account);
         
         let escrow_store = borrow_global_mut<EscrowStore>(escrow_store_addr);
@@ -475,7 +527,7 @@ module propachain::propachain {
         });
 
         if (escrow.seller_landlord_confirmed) {
-            release_funds_internal(escrow_store_addr, property_store_addr, escrow_id);
+            release_funds_no_receipts(escrow_store_addr, property_store_addr, escrow_id);
         };
     }
 
@@ -484,7 +536,7 @@ module propachain::propachain {
         escrow_store_addr: address,
         property_store_addr: address,
         escrow_id: u64,
-    ) acquires EscrowStore, PropertyListingsStore, EscrowFunds {
+    ) acquires EscrowStore, PropertyListingsStore, EscrowFunds, ReceiptStore {
         let caller = signer::address_of(account);
         
         let escrow_store = borrow_global_mut<EscrowStore>(escrow_store_addr);
@@ -505,15 +557,15 @@ module propachain::propachain {
         });
 
         if (escrow.buyer_renter_confirmed) {
-            release_funds_internal(escrow_store_addr, property_store_addr, escrow_id);
+            release_funds_no_receipts(escrow_store_addr, property_store_addr, escrow_id);
         };
     }
 
-    fun release_funds_internal(
+    fun release_funds_no_receipts(
         escrow_store_addr: address,
         property_store_addr: address,
         escrow_id: u64,
-    ) acquires EscrowStore, PropertyListingsStore, EscrowFunds {
+    ) acquires EscrowStore, PropertyListingsStore, EscrowFunds, ReceiptStore {
         let escrow_store = borrow_global_mut<EscrowStore>(escrow_store_addr);
         let escrow = simple_map::borrow_mut(&mut escrow_store.escrows, &escrow_id);
         
@@ -522,8 +574,6 @@ module propachain::propachain {
 
         // Register seller for AptosCoin if needed
         if (!coin::is_account_registered<AptosCoin>(escrow.seller_landlord)) {
-            // We can't register for them without their signer, so this will fail
-            // In production, seller must be registered before transaction
             abort E_NOT_AUTHORIZED
         };
 
@@ -536,29 +586,53 @@ module propachain::propachain {
 
         let current_time = timestamp::now_seconds();
 
-        // Update property status
+        // Update property status and rental dates if applicable
         let property_store = borrow_global_mut<PropertyListingsStore>(property_store_addr);
         let property = simple_map::borrow_mut(&mut property_store.listings, &escrow.property_id);
 
-        if (escrow.listing_type == LISTING_TYPE_RENT) {
-            // 30 days in seconds
+        // Capture receipt IDs and listing type before borrowing ends
+        let buyer_receipt_id_opt = escrow.buyer_renter_receipt_id;
+        let seller_receipt_id_opt = escrow.seller_landlord_receipt_id;
+        let listing_type = escrow.listing_type;
+
+        if (listing_type == LISTING_TYPE_RENT) {
             let seconds_in_month: u64 = 30 * 24 * 60 * 60;
             let rental_period = *option::borrow(&property.rental_period_months);
             let rental_duration = rental_period * seconds_in_month;
             
-            property.rental_start_date = option::some(current_time);
-            property.rental_end_date = option::some(current_time + rental_duration);
+            let start_date = current_time;
+            let end_date = current_time + rental_duration;
+            
+            property.rental_start_date = option::some(start_date);
+            property.rental_end_date = option::some(end_date);
             property.status = STATUS_RENTED;
+
+            // Update receipts with rental dates - do this after we're done with escrow borrow
+            escrow.resolved = true;
+            
+            // Now update receipts (this will borrow ReceiptStore, not EscrowStore)
+            if (option::is_some(&buyer_receipt_id_opt)) {
+                let buyer_receipt_id = *option::borrow(&buyer_receipt_id_opt);
+                let receipt_store = borrow_global_mut<ReceiptStore>(escrow_store_addr);
+                let buyer_receipt = simple_map::borrow_mut(&mut receipt_store.receipts, &buyer_receipt_id);
+                buyer_receipt.rental_start_date = option::some(start_date);
+                buyer_receipt.rental_end_date = option::some(end_date);
+            };
+
+            if (option::is_some(&seller_receipt_id_opt)) {
+                let seller_receipt_id = *option::borrow(&seller_receipt_id_opt);
+                let receipt_store = borrow_global_mut<ReceiptStore>(escrow_store_addr);
+                let seller_receipt = simple_map::borrow_mut(&mut receipt_store.receipts, &seller_receipt_id);
+                seller_receipt.rental_start_date = option::some(start_date);
+                seller_receipt.rental_end_date = option::some(end_date);
+            };
         } else {
-            // For SALE: Transfer ownership to buyer
-            property.owner = escrow.buyer_renter;
             property.status = STATUS_COMPLETED;
+            escrow.resolved = true;
         };
 
         property.locked_by = option::none();
         property.escrow_id = option::none();
-
-        escrow.resolved = true;
 
         event::emit(FundsReleased {
             escrow_id,
@@ -636,7 +710,7 @@ module propachain::propachain {
         escrow_store_addr: address,
         property_store_addr: address,
         escrow_id: u64,
-    ) acquires AdminCap, EscrowStore, PropertyListingsStore, EscrowFunds {
+    ) acquires AdminCap, EscrowStore, PropertyListingsStore, EscrowFunds, ReceiptStore {
         // Verify admin
         let admin_cap = borrow_global<AdminCap>(admin_addr);
         assert!(signer::address_of(account) == admin_cap.admin_address, E_NOT_AUTHORIZED);
@@ -665,23 +739,49 @@ module propachain::propachain {
         let property_store = borrow_global_mut<PropertyListingsStore>(property_store_addr);
         let property = simple_map::borrow_mut(&mut property_store.listings, &escrow.property_id);
 
-        if (escrow.listing_type == LISTING_TYPE_RENT) {
+        // Capture receipt IDs and listing type before borrowing ends
+        let buyer_receipt_id_opt = escrow.buyer_renter_receipt_id;
+        let seller_receipt_id_opt = escrow.seller_landlord_receipt_id;
+        let listing_type = escrow.listing_type;
+
+        if (listing_type == LISTING_TYPE_RENT) {
             let seconds_in_month: u64 = 30 * 24 * 60 * 60;
             let rental_period = *option::borrow(&property.rental_period_months);
             let rental_duration = rental_period * seconds_in_month;
             
-            property.rental_start_date = option::some(current_time);
-            property.rental_end_date = option::some(current_time + rental_duration);
+            let start_date = current_time;
+            let end_date = current_time + rental_duration;
+            
+            property.rental_start_date = option::some(start_date);
+            property.rental_end_date = option::some(end_date);
             property.status = STATUS_RENTED;
+
+            // Update receipts with rental dates - do this after we're done with escrow borrow
+            escrow.resolved = true;
+            
+            // Now update receipts (this will borrow ReceiptStore, not EscrowStore)
+            if (option::is_some(&buyer_receipt_id_opt)) {
+                let buyer_receipt_id = *option::borrow(&buyer_receipt_id_opt);
+                let receipt_store = borrow_global_mut<ReceiptStore>(escrow_store_addr);
+                let buyer_receipt = simple_map::borrow_mut(&mut receipt_store.receipts, &buyer_receipt_id);
+                buyer_receipt.rental_start_date = option::some(start_date);
+                buyer_receipt.rental_end_date = option::some(end_date);
+            };
+
+            if (option::is_some(&seller_receipt_id_opt)) {
+                let seller_receipt_id = *option::borrow(&seller_receipt_id_opt);
+                let receipt_store = borrow_global_mut<ReceiptStore>(escrow_store_addr);
+                let seller_receipt = simple_map::borrow_mut(&mut receipt_store.receipts, &seller_receipt_id);
+                seller_receipt.rental_start_date = option::some(start_date);
+                seller_receipt.rental_end_date = option::some(end_date);
+            };
         } else {
-            property.owner = escrow.buyer_renter;
             property.status = STATUS_COMPLETED;
+            escrow.resolved = true;
         };
 
         property.locked_by = option::none();
         property.escrow_id = option::none();
-
-        escrow.resolved = true;
 
         event::emit(DisputeResolved {
             escrow_id,
@@ -697,8 +797,9 @@ module propachain::propachain {
         admin_addr: address,
         escrow_store_addr: address,
         property_store_addr: address,
+        receipt_store_addr: address,
         escrow_id: u64,
-    ) acquires AdminCap, EscrowStore, PropertyListingsStore, EscrowFunds {
+    ) acquires AdminCap, EscrowStore, PropertyListingsStore, EscrowFunds, ReceiptStore, UserReceipts {
         // Verify admin
         let admin_cap = borrow_global<AdminCap>(admin_addr);
         assert!(signer::address_of(account) == admin_cap.admin_address, E_NOT_AUTHORIZED);
@@ -716,6 +817,17 @@ module propachain::propachain {
         
         coin::deposit(escrow.buyer_renter, refund);
 
+        // Delete receipts
+        let buyer_receipt_id = *option::borrow(&escrow.buyer_renter_receipt_id);
+        let seller_receipt_id = *option::borrow(&escrow.seller_landlord_receipt_id);
+        
+        delete_receipt(receipt_store_addr, buyer_receipt_id);
+        delete_receipt(receipt_store_addr, seller_receipt_id);
+
+        // Remove from user tracking
+        remove_user_receipt(escrow.buyer_renter, buyer_receipt_id);
+        remove_user_receipt(escrow.seller_landlord, seller_receipt_id);
+
         // Update property
         let property_store = borrow_global_mut<PropertyListingsStore>(property_store_addr);
         let property = simple_map::borrow_mut(&mut property_store.listings, &escrow.property_id);
@@ -730,9 +842,142 @@ module propachain::propachain {
             escrow_id,
             winner: escrow.buyer_renter,
             amount,
-            receipts_deleted: false,
+            receipts_deleted: true,
             timestamp: timestamp::now_seconds(),
         });
+    }
+
+    // ==================== Helper Functions ====================
+
+    fun create_receipts(
+        receipt_store_addr: address,
+        listing_type: u8,
+        property_id: u64,
+        property_address: String,
+        property_type: String,
+        buyer_renter: address,
+        seller_landlord: address,
+        amount_paid: u64,
+        rental_start_date: Option<u64>,
+        rental_end_date: Option<u64>,
+        rental_period_months: Option<u64>,
+        monthly_rent: Option<u64>,
+        metadata_uri: String,
+        timestamp: u64,
+    ): (u64, u64) acquires ReceiptStore {
+        let receipt_store = borrow_global_mut<ReceiptStore>(receipt_store_addr);
+        
+        // Create buyer receipt
+        let buyer_receipt_id = receipt_store.next_id;
+        receipt_store.next_id = receipt_store.next_id + 1;
+        
+        let buyer_receipt = PropertyReceipt {
+            id: buyer_receipt_id,
+            listing_type,
+            timestamp,
+            property_id,
+            property_address,
+            property_type,
+            buyer_renter_address: buyer_renter,
+            seller_landlord_address: seller_landlord,
+            amount_paid,
+            rental_start_date,
+            rental_end_date,
+            rental_period_months,
+            monthly_rent,
+            metadata_uri,
+        };
+
+        simple_map::add(&mut receipt_store.receipts, buyer_receipt_id, buyer_receipt);
+
+        event::emit(ReceiptMinted {
+            receipt_id: buyer_receipt_id,
+            recipient: buyer_renter,
+            listing_type,
+            amount: amount_paid,
+            timestamp,
+        });
+
+        // Create seller receipt
+        let seller_receipt_id = receipt_store.next_id;
+        receipt_store.next_id = receipt_store.next_id + 1;
+        
+        let seller_receipt = PropertyReceipt {
+            id: seller_receipt_id,
+            listing_type,
+            timestamp,
+            property_id,
+            property_address,
+            property_type,
+            buyer_renter_address: buyer_renter,
+            seller_landlord_address: seller_landlord,
+            amount_paid,
+            rental_start_date,
+            rental_end_date,
+            rental_period_months,
+            monthly_rent,
+            metadata_uri,
+        };
+
+        simple_map::add(&mut receipt_store.receipts, seller_receipt_id, seller_receipt);
+
+        event::emit(ReceiptMinted {
+            receipt_id: seller_receipt_id,
+            recipient: seller_landlord,
+            listing_type,
+            amount: amount_paid,
+            timestamp,
+        });
+
+        (buyer_receipt_id, seller_receipt_id)
+    }
+
+    fun update_receipt_rental_dates(
+        receipt_store_addr: address,
+        buyer_receipt_id: Option<u64>,
+        seller_receipt_id: Option<u64>,
+        start_date: u64,
+        end_date: u64,
+    ) acquires ReceiptStore {
+        if (option::is_some(&buyer_receipt_id)) {
+            let receipt_id = *option::borrow(&buyer_receipt_id);
+            let receipt_store = borrow_global_mut<ReceiptStore>(receipt_store_addr);
+            let receipt = simple_map::borrow_mut(&mut receipt_store.receipts, &receipt_id);
+            receipt.rental_start_date = option::some(start_date);
+            receipt.rental_end_date = option::some(end_date);
+        };
+
+        if (option::is_some(&seller_receipt_id)) {
+            let receipt_id = *option::borrow(&seller_receipt_id);
+            let receipt_store = borrow_global_mut<ReceiptStore>(receipt_store_addr);
+            let receipt = simple_map::borrow_mut(&mut receipt_store.receipts, &receipt_id);
+            receipt.rental_start_date = option::some(start_date);
+            receipt.rental_end_date = option::some(end_date);
+        };
+    }
+
+    fun track_user_receipt(user_addr: address, receipt_id: u64) acquires UserReceipts {
+        if (exists<UserReceipts>(user_addr)) {
+            let user_receipts = borrow_global_mut<UserReceipts>(user_addr);
+            vector::push_back(&mut user_receipts.receipt_ids, receipt_id);
+        };
+    }
+
+    fun remove_user_receipt(user_addr: address, receipt_id: u64) acquires UserReceipts {
+        if (exists<UserReceipts>(user_addr)) {
+            let user_receipts = borrow_global_mut<UserReceipts>(user_addr);
+            let (found, index) = vector::index_of(&user_receipts.receipt_ids, &receipt_id);
+            if (found) {
+                vector::remove(&mut user_receipts.receipt_ids, index);
+            };
+        };
+    }
+
+    fun delete_receipt(receipt_store_addr: address, receipt_id: u64) acquires ReceiptStore {
+        let receipt_store = borrow_global_mut<ReceiptStore>(receipt_store_addr);
+        if (simple_map::contains_key(&receipt_store.receipts, &receipt_id)) {
+            simple_map::remove(&mut receipt_store.receipts, &receipt_id);
+        };
     }
 
     // ==================== View/Getter Functions ====================
@@ -770,10 +1015,97 @@ module propachain::propachain {
     }
 
     #[view]
+    public fun get_property_listing_type(store_addr: address, property_id: u64): u8 acquires PropertyListingsStore {
+        let store = borrow_global<PropertyListingsStore>(store_addr);
+        let property = simple_map::borrow(&store.listings, &property_id);
+        property.listing_type
+    }
+
+    #[view]
+    public fun is_property_locked(store_addr: address, property_id: u64): bool acquires PropertyListingsStore {
+        let store = borrow_global<PropertyListingsStore>(store_addr);
+        let property = simple_map::borrow(&store.listings, &property_id);
+        property.status == STATUS_IN_ESCROW
+    }
+
+    #[view]
+    public fun get_escrow_amount(store_addr: address, escrow_id: u64): u64 acquires EscrowStore {
+        let store = borrow_global<EscrowStore>(store_addr);
+        let escrow = simple_map::borrow(&store.escrows, &escrow_id);
+        escrow.amount
+    }
+
+    #[view]
     public fun is_escrow_resolved(store_addr: address, escrow_id: u64): bool acquires EscrowStore {
         let store = borrow_global<EscrowStore>(store_addr);
         let escrow = simple_map::borrow(&store.escrows, &escrow_id);
         escrow.resolved
+    }
+
+    #[view]
+    public fun is_dispute_raised(store_addr: address, escrow_id: u64): bool acquires EscrowStore {
+        let store = borrow_global<EscrowStore>(store_addr);
+        let escrow = simple_map::borrow(&store.escrows, &escrow_id);
+        escrow.dispute_raised
+    }
+
+    #[view]
+    public fun get_confirmation_status(store_addr: address, escrow_id: u64): (bool, bool) acquires EscrowStore {
+        let store = borrow_global<EscrowStore>(store_addr);
+        let escrow = simple_map::borrow(&store.escrows, &escrow_id);
+        (escrow.buyer_renter_confirmed, escrow.seller_landlord_confirmed)
+    }
+
+    #[view]
+    public fun get_receipt(receipt_store_addr: address, receipt_id: u64): PropertyReceipt acquires ReceiptStore {
+        let receipt_store = borrow_global<ReceiptStore>(receipt_store_addr);
+        assert!(simple_map::contains_key(&receipt_store.receipts, &receipt_id), E_RECEIPT_NOT_FOUND);
+        *simple_map::borrow(&receipt_store.receipts, &receipt_id)
+    }
+
+    #[view]
+    public fun get_receipt_amount(receipt_store_addr: address, receipt_id: u64): u64 acquires ReceiptStore {
+        let receipt_store = borrow_global<ReceiptStore>(receipt_store_addr);
+        let receipt = simple_map::borrow(&receipt_store.receipts, &receipt_id);
+        receipt.amount_paid
+    }
+
+    #[view]
+    public fun get_user_receipts(user_addr: address): vector<u64> acquires UserReceipts {
+        if (exists<UserReceipts>(user_addr)) {
+            let user_receipts = borrow_global<UserReceipts>(user_addr);
+            user_receipts.receipt_ids
+        } else {
+            vector::empty()
+        }
+    }
+
+    #[view]
+    public fun get_property_images(store_addr: address, property_id: u64): vector<String> acquires PropertyListingsStore {
+        let store = borrow_global<PropertyListingsStore>(store_addr);
+        let property = simple_map::borrow(&store.listings, &property_id);
+        property.images_cids
+    }
+
+    #[view]
+    public fun get_property_video(store_addr: address, property_id: u64): String acquires PropertyListingsStore {
+        let store = borrow_global<PropertyListingsStore>(store_addr);
+        let property = simple_map::borrow(&store.listings, &property_id);
+        property.video_cid
+    }
+
+    #[view]
+    public fun get_property_documents(store_addr: address, property_id: u64): Option<String> acquires PropertyListingsStore {
+        let store = borrow_global<PropertyListingsStore>(store_addr);
+        let property = simple_map::borrow(&store.listings, &property_id);
+        property.documents_cid
+    }
+
+    #[view]
+    public fun get_property_price(store_addr: address, property_id: u64): u64 acquires PropertyListingsStore {
+        let store = borrow_global<PropertyListingsStore>(store_addr);
+        let property = simple_map::borrow(&store.listings, &property_id);
+        property.price
     }
 
     #[view]
@@ -784,9 +1116,23 @@ module propachain::propachain {
     }
 
     #[view]
-    public fun get_property_price(store_addr: address, property_id: u64): u64 acquires PropertyListingsStore {
+    public fun get_escrow_buyer_renter(store_addr: address, escrow_id: u64): address acquires EscrowStore {
+        let store = borrow_global<EscrowStore>(store_addr);
+        let escrow = simple_map::borrow(&store.escrows, &escrow_id);
+        escrow.buyer_renter
+    }
+
+    #[view]
+    public fun get_escrow_seller_landlord(store_addr: address, escrow_id: u64): address acquires EscrowStore {
+        let store = borrow_global<EscrowStore>(store_addr);
+        let escrow = simple_map::borrow(&store.escrows, &escrow_id);
+        escrow.seller_landlord
+    }
+
+    #[view]
+    public fun get_rental_dates(store_addr: address, property_id: u64): (Option<u64>, Option<u64>) acquires PropertyListingsStore {
         let store = borrow_global<PropertyListingsStore>(store_addr);
         let property = simple_map::borrow(&store.listings, &property_id);
-        property.price
+        (property.rental_start_date, property.rental_end_date)
     }
 }

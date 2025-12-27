@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 export const usePropertyOperations = () => {
   const [loading, setLoading] = useState(false);
   const { isConnected, signAndSubmitTransaction, walletAddress } =
-      useMovementWallet();
+    useMovementWallet();
 
   const getPropertyById = async (propertyId) => {
     try {
@@ -80,15 +80,48 @@ export const usePropertyOperations = () => {
     }
   };
 
-  const depositToEscrow = async (toastId, propertyId, amount) => {
+  const getEscrowDetails = async (escrowId) => {
+    try {
+      const escrow = await aptos.view({
+        payload: {
+          function: `${MOVEMENT_CONTRACT_ADDRESS}::propachain::get_escrow`,
+          functionArguments: [MOVEMENT_CONTRACT_ADDRESS, escrowId.toString()],
+          typeArguments: [],
+        },
+      });
 
+      return escrow[0];
+    } catch (err) {
+      console.error(`Error fetching escrow details:`, err);
+      throw err;
+    }
+  };
+
+  const isEscrowResolved = async (escrowId) => {
+    try {
+      const resolved = await aptos.view({
+        payload: {
+          function: `${MOVEMENT_CONTRACT_ADDRESS}::propachain::is_escrow_resolved`,
+          functionArguments: [MOVEMENT_CONTRACT_ADDRESS, escrowId.toString()],
+          typeArguments: [],
+        },
+      });
+
+      return resolved[0];
+    } catch (err) {
+      console.error(`Error checking escrow resolution:`, err);
+      throw err;
+    }
+  };
+
+  const depositToEscrow = async (toastId, propertyId, amount, documentCid) => {
     if (!isConnected) {
       const errorMsg = "Please connect your wallet first";
       toast.error(errorMsg, { id: toastId });
       console.warn(errorMsg, { isConnected });
       return false;
     }
-    
+
     if (!walletAddress) {
       const errorMsg = "Wallet address not available";
       toast.error(errorMsg, { id: toastId });
@@ -99,7 +132,7 @@ export const usePropertyOperations = () => {
     try {
       setLoading(true);
       console.log("Depositing to escrow:", { propertyId, amount });
-      
+
       const amountInOctas = Number(amount);
 
       const transaction = {
@@ -109,14 +142,16 @@ export const usePropertyOperations = () => {
           functionArguments: [
             MOVEMENT_CONTRACT_ADDRESS, // store_addr
             MOVEMENT_CONTRACT_ADDRESS, // escrow_store_addr
+            MOVEMENT_CONTRACT_ADDRESS, // receipt_store_addr
             Number(propertyId),
-            amountInOctas
+            amountInOctas,
+            documentCid || "",
           ],
         },
       };
 
       const result = await signAndSubmitTransaction(transaction);
-      
+
       toast.dismiss(toastId);
       toast.success("Property Processed successfully!");
       console.log("Escrow deposit successful:", result);
@@ -125,7 +160,6 @@ export const usePropertyOperations = () => {
       setTimeout(() => navigate(`/app/property/${propertyId}`), 1500);
 
       return true;
-     
     } catch (error) {
       toast.dismiss(toastId);
       const errorMessage = error?.message || "An unexpected error occurred";
@@ -143,6 +177,8 @@ export const usePropertyOperations = () => {
     getPropertyStatus,
     getPropertyOwner,
     getPropertyPrice,
+    getEscrowDetails,
+    isEscrowResolved,
     depositToEscrow,
   };
 };

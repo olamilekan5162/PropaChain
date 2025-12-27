@@ -1,8 +1,7 @@
 // ===== MOVEMENT BLOCKCHAIN CONSTANTS =====
 // Deployed contract address on Movement Testnet (Bardock)
 // This is YOUR account address where the contract was deployed
-export const MOVEMENT_CONTRACT_ADDRESS =
-  "0x51bc1ceb0077177745b3de049c63bcfbb189c7a436829c6d1391b116cdc2fac5";
+export const MOVEMENT_CONTRACT_ADDRESS ="0xd29827b0d1e7a077e595b903a49127190a7a73036d3a396a529eb7e52c4c9f20"
 
 // Platform configuration
 export const PLATFORM_TOKEN_NAME = "PropachainToken";
