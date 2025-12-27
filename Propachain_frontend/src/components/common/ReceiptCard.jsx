@@ -9,13 +9,24 @@ import {
 import { Button } from "./Button";
 
 export const ReceiptCard = ({ receipt, onViewDetails, onDownload }) => {
+  // Determine status from receipt data
+  const getStatus = () => {
+    if (receipt.is_disputed) return "Dispute Raised";
+    if (receipt.buyer_confirmed && receipt.seller_confirmed) return "Completed";
+    if (receipt.buyer_confirmed || receipt.seller_confirmed)
+      return "Partially Confirmed";
+    return "Awaiting Confirmation";
+  };
+
+  const status = getStatus();
+
   const getStatusColor = (status) => {
     switch (status) {
       case "Completed":
         return "bg-green-50 border-green-200 text-green-900";
       case "Dispute Raised":
         return "bg-red-50 border-red-200 text-red-900";
-      case "Both Confirmed":
+      case "Partially Confirmed":
         return "bg-blue-50 border-blue-200 text-blue-900";
       case "Awaiting Confirmation":
         return "bg-yellow-50 border-yellow-200 text-yellow-900";
@@ -30,7 +41,7 @@ export const ReceiptCard = ({ receipt, onViewDetails, onDownload }) => {
         return <CheckCircle size={16} />;
       case "Dispute Raised":
         return <AlertCircle size={16} />;
-      case "Both Confirmed":
+      case "Partially Confirmed":
         return <CheckCircle size={16} />;
       case "Awaiting Confirmation":
         return <Clock size={16} />;
@@ -87,11 +98,11 @@ export const ReceiptCard = ({ receipt, onViewDetails, onDownload }) => {
       <div className="flex items-center justify-between">
         <span
           className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(
-            receipt.status
+            status
           )}`}
         >
-          {getStatusIcon(receipt.status)}
-          {receipt.status}
+          {getStatusIcon(status)}
+          {status}
         </span>
         <div className="flex gap-2">
           <button

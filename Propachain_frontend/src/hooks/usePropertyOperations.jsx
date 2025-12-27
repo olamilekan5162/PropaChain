@@ -156,15 +156,202 @@ export const usePropertyOperations = () => {
       toast.success("Property Processed successfully!");
       console.log("Escrow deposit successful:", result);
 
-      // Navigate to profile after successful upload
-      setTimeout(() => navigate(`/app/property/${propertyId}`), 1500);
-
       return true;
     } catch (error) {
       toast.dismiss(toastId);
       const errorMessage = error?.message || "An unexpected error occurred";
       toast.error(`Property purchase failed: ${errorMessage}`);
       console.error("purchase error:", error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const buyerRenterConfirms = async (escrowId) => {
+    if (!isConnected) {
+      toast.error("Please connect your wallet first");
+      return false;
+    }
+
+    try {
+      setLoading(true);
+      const toastId = toast.loading("Confirming transaction...");
+
+      const transaction = {
+        data: {
+          function: `${MOVEMENT_CONTRACT_ADDRESS}::propachain::buyer_renter_confirms`,
+          typeArguments: [],
+          functionArguments: [
+            MOVEMENT_CONTRACT_ADDRESS, // escrow_store_addr
+            MOVEMENT_CONTRACT_ADDRESS, // property_store_addr
+            Number(escrowId),
+          ],
+        },
+      };
+
+      const result = await signAndSubmitTransaction(transaction);
+
+      toast.dismiss(toastId);
+      toast.success("Transaction confirmed successfully!");
+      console.log("Buyer confirmation successful:", result);
+      return true;
+    } catch (error) {
+      const errorMessage = error?.message || "Confirmation failed";
+      toast.error(`Confirmation failed: ${errorMessage}`);
+      console.error("Buyer confirmation error:", error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sellerLandlordConfirms = async (escrowId) => {
+    if (!isConnected) {
+      toast.error("Please connect your wallet first");
+      return false;
+    }
+
+    try {
+      setLoading(true);
+      const toastId = toast.loading("Confirming transaction...");
+
+      const transaction = {
+        data: {
+          function: `${MOVEMENT_CONTRACT_ADDRESS}::propachain::seller_landlord_confirms`,
+          typeArguments: [],
+          functionArguments: [
+            MOVEMENT_CONTRACT_ADDRESS, // escrow_store_addr
+            MOVEMENT_CONTRACT_ADDRESS, // property_store_addr
+            Number(escrowId),
+          ],
+        },
+      };
+
+      const result = await signAndSubmitTransaction(transaction);
+
+      toast.dismiss(toastId);
+      toast.success("Transaction confirmed successfully!");
+      console.log("Seller confirmation successful:", result);
+      return true;
+    } catch (error) {
+      const errorMessage = error?.message || "Confirmation failed";
+      toast.error(`Confirmation failed: ${errorMessage}`);
+      console.error("Seller confirmation error:", error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getConfirmationStatus = async (escrowId) => {
+    try {
+      const status = await aptos.view({
+        payload: {
+          function: `${MOVEMENT_CONTRACT_ADDRESS}::propachain::get_confirmation_status`,
+          functionArguments: [MOVEMENT_CONTRACT_ADDRESS, escrowId.toString()],
+          typeArguments: [],
+        },
+      });
+
+      return {
+        buyerConfirmed: status[0],
+        sellerConfirmed: status[1],
+      };
+    } catch (err) {
+      console.error(`Error fetching confirmation status:`, err);
+      throw err;
+    }
+  };
+
+  const raiseDispute = async (escrowId, reason) => {
+    if (!isConnected) {
+      toast.error("Please connect your wallet first");
+      return false;
+    }
+
+    try {
+      setLoading(true);
+      const toastId = toast.loading("Raising dispute...");
+
+      const transaction = {
+        data: {
+          function: `${MOVEMENT_CONTRACT_ADDRESS}::propachain::raise_dispute`,
+          typeArguments: [],
+          functionArguments: [
+            MOVEMENT_CONTRACT_ADDRESS, // escrow_store_addr
+            Number(escrowId),
+            reason,
+          ],
+        },
+      };
+
+      const result = await signAndSubmitTransaction(transaction);
+
+      toast.dismiss(toastId);
+      toast.success("Dispute raised successfully!");
+      console.log("Dispute raised:", result);
+      return true;
+    } catch (error) {
+      const errorMessage = error?.message || "Failed to raise dispute";
+      toast.error(`Dispute failed: ${errorMessage}`);
+      console.error("Dispute error:", error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isDisputeRaised = async (escrowId) => {
+    try {
+      const disputed = await aptos.view({
+        payload: {
+          function: `${MOVEMENT_CONTRACT_ADDRESS}::propachain::is_dispute_raised`,
+          functionArguments: [MOVEMENT_CONTRACT_ADDRESS, escrowId.toString()],
+          typeArguments: [],
+        },
+      });
+
+      return disputed[0];
+    } catch (err) {
+      console.error(`Error checking dispute status:`, err);
+      throw err;
+    }
+  };
+
+  const checkRentalExpiration = async (escrowId) => {
+    if (!isConnected) {
+      toast.error("Please connect your wallet first");
+      return false;
+    }
+
+    try {
+      setLoading(true);
+      const toastId = toast.loading("Checking rental expiration...");
+
+      const transaction = {
+        data: {
+          function: `${MOVEMENT_CONTRACT_ADDRESS}::propachain::check_rental_expiration`,
+          typeArguments: [],
+          functionArguments: [
+            MOVEMENT_CONTRACT_ADDRESS, // escrow_store_addr
+            MOVEMENT_CONTRACT_ADDRESS, // property_store_addr
+            Number(escrowId),
+          ],
+        },
+      };
+
+      const result = await signAndSubmitTransaction(transaction);
+
+      toast.dismiss(toastId);
+      toast.success("Rental expiration processed successfully!");
+      console.log("Rental expiration check successful:", result);
+      return true;
+    } catch (error) {
+      const errorMessage =
+        error?.message || "Failed to check rental expiration";
+      toast.error(errorMessage);
+      console.error("Rental expiration error:", error);
       return false;
     } finally {
       setLoading(false);
@@ -180,5 +367,11 @@ export const usePropertyOperations = () => {
     getEscrowDetails,
     isEscrowResolved,
     depositToEscrow,
+    buyerRenterConfirms,
+    sellerLandlordConfirms,
+    getConfirmationStatus,
+    raiseDispute,
+    isDisputeRaised,
+    checkRentalExpiration,
   };
 };

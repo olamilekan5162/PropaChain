@@ -26,24 +26,31 @@ export const useReceipts = () => {
 
       const userReceipts = [];
 
-      // Query account resources to find PropertyReceipt NFTs
-      const resources = await aptos.getAccountResources({
-        accountAddress: walletAddress,
-        resouresourceType: `${CONTRACT_ADDRESS}::propachain::PropertyReceipt`,
+      // Get all receipt IDs for the user using the view function
+      const receiptIds = await aptos.view({
+        payload: {
+          function: `${CONTRACT_ADDRESS}::propachain::get_user_receipts`,
+          functionArguments: [walletAddress],
+          typeArguments: [],
+        },
       });
 
-      // Filter for PropertyReceipt resources
-      // PropertyReceipt NFTs are stored with the resource type:
-      // {MOVEMENT_CONTRACT_ADDRESS}::propachain::PropertyReceipt
-      const receiptResourceType = `${CONTRACT_ADDRESS}::propachain::PropertyReceipt`;
+      console.log("User receipt IDs:", receiptIds);
 
-      resources.forEach((resource) => {
-        if (resource.type === receiptResourceType) {
-          const receipt = resource.data;
-          const formattedReceipt = formatReceipt(receipt);
-          userReceipts.push(formattedReceipt);
+      // If user has receipt IDs, fetch each receipt with escrow details
+      if (receiptIds && receiptIds[0] && receiptIds[0].length > 0) {
+        for (const receiptId of receiptIds[0]) {
+          try {
+            const receiptData = await getReceiptWithEscrow(receiptId);
+            if (receiptData) {
+              userReceipts.push(receiptData);
+            }
+          } catch (err) {
+            console.error(`Error fetching receipt ${receiptId}:`, err);
+            // Continue with other receipts even if one fails
+          }
         }
-      });
+      }
 
       // Sort receipts by timestamp (newest first)
       userReceipts.sort((a, b) => b.timestamp - a.timestamp);
@@ -90,12 +97,126 @@ export const useReceipts = () => {
 
     return {
       ...receipt,
+      id: receipt.id,
       escrow_id: receipt.id, // Map NFT id to escrow_id for UI compatibility
-      formattedAmount: (receipt.amount_paid / 100_000_000).toFixed(2),
-      formattedDate: new Date(receipt.timestamp * 1000).toLocaleDateString(),
-      listingType: receipt.listing_type === 1 ? "Sale" : "Rent",
-      status: "Completed", // NFT receipts are only created after completion
+      formattedAmount: (parseInt(receipt.amount_paid) / 100_000_000).toFixed(2),
+      formattedDate: new Date(
+        parseInt(receipt.timestamp) * 1000
+      ).toLocaleDateString(),
+      listingType: parseInt(receipt.listing_type) === 1 ? "Sale" : "Rent",
     };
+  };
+
+  /**
+   * Get receipt status with color coding
+   */
+  const getReceiptStatus = (receipt) => {
+    // Determine status based on confirmations and dispute
+    if (receipt.is_disputed) {
+      return {
+        status: "Dispute Raised",
+        color: "bg-red-100 text-red-800",
+      };
+    }
+
+    if (receipt.buyer_confirmed && receipt.seller_confirmed) {
+      return {
+        status: "Completed",
+        color: "bg-green-100 text-green-800",
+      };
+    }
+
+    if (receipt.buyer_confirmed || receipt.seller_confirmed) {
+      return {
+        status: "Partially Confirmed",
+        color: "bg-blue-100 text-blue-800",
+      };
+    }
+
+    return {
+      status: "Awaiting Confirmation",
+      color: "bg-yellow-100 text-yellow-800",
+    };
+  };
+
+  /**
+   * Get receipt with escrow details
+   */
+  const getReceiptWithEscrow = async (receiptId) => {
+    try {
+      const receiptData = await aptos.view({
+        payload: {
+          function: `${CONTRACT_ADDRESS}::propachain::get_receipt`,
+          functionArguments: [CONTRACT_ADDRESS, receiptId.toString()],
+          typeArguments: [],
+        },
+      });
+
+      if (receiptData && receiptData[0]) {
+        const receipt = receiptData[0];
+
+        // Get property details to find escrow ID
+        const propertyData = await aptos.view({
+          payload: {
+            function: `${CONTRACT_ADDRESS}::propachain::get_property`,
+            functionArguments: [
+              CONTRACT_ADDRESS,
+              receipt.property_id.toString(),
+            ],
+            typeArguments: [],
+          },
+        });
+
+        console.log("PropData:", propertyData);
+
+        const escrowId = propertyData[0]?.escrow_id?.vec?.[0];
+
+        // If there's an escrow, get confirmation status
+        let confirmationStatus = {
+          buyerConfirmed: false,
+          sellerConfirmed: false,
+        };
+        let isDisputed = false;
+
+        if (escrowId) {
+          try {
+            const status = await aptos.view({
+              payload: {
+                function: `${CONTRACT_ADDRESS}::propachain::get_confirmation_status`,
+                functionArguments: [CONTRACT_ADDRESS, escrowId.toString()],
+                typeArguments: [],
+              },
+            });
+            confirmationStatus = {
+              buyerConfirmed: status[0],
+              sellerConfirmed: status[1],
+            };
+
+            const disputeStatus = await aptos.view({
+              payload: {
+                function: `${CONTRACT_ADDRESS}::propachain::is_dispute_raised`,
+                functionArguments: [CONTRACT_ADDRESS, escrowId.toString()],
+                typeArguments: [],
+              },
+            });
+            isDisputed = disputeStatus[0];
+          } catch (err) {
+            console.error("Error fetching escrow status:", err);
+          }
+        }
+
+        return {
+          ...formatReceipt(receipt),
+          escrowId,
+          buyer_confirmed: confirmationStatus.buyerConfirmed,
+          seller_confirmed: confirmationStatus.sellerConfirmed,
+          is_disputed: isDisputed,
+        };
+      }
+    } catch (err) {
+      console.error(`Error fetching receipt with escrow:`, err);
+      throw err;
+    }
   };
 
   return {
@@ -105,5 +226,7 @@ export const useReceipts = () => {
     getUserReceipts,
     generateReceiptAfterDeposit,
     formatReceipt,
+    getReceiptStatus,
+    getReceiptWithEscrow,
   };
 };

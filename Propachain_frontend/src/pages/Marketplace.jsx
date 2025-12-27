@@ -4,87 +4,15 @@ import { Input } from "../components/common/Input";
 import { PropertyCard } from "../components/common/PropertyCard";
 import { useState, useEffect } from "react";
 import { useFetchProperties } from "../hooks/useFetchProperties";
+import toast from "react-hot-toast";
 
-// Mock Data
-const ALL_PROPERTIES = [
-  {
-    id: 1,
-    title: "Luxury Penthouse in Downtown",
-    location: "Downtown, Metro City",
-    price: 1500000,
-    image:
-      "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800",
-    beds: 3,
-    baths: 2,
-    sqft: 2200,
-    status: "Available",
-  },
-  {
-    id: 2,
-    title: "Modern Beachfront Villa",
-    location: "Coastal Bay, Sunshine State",
-    price: 2800000,
-    image:
-      "https://images.unsplash.com/photo-1600596542815-6000255adeba?auto=format&fit=crop&q=80&w=800",
-    beds: 5,
-    baths: 4,
-    sqft: 4500,
-    status: "Rented",
-  },
-  {
-    id: 3,
-    title: "Eco-Friendly Smart Home",
-    location: "Green Valley, Eco District",
-    price: 950000,
-    image:
-      "https://images.unsplash.com/photo-1598228723793-52759bba239c?auto=format&fit=crop&q=80&w=800",
-    beds: 4,
-    baths: 3,
-    sqft: 3100,
-    status: "Available",
-  },
-  {
-    id: 4,
-    title: "Urban Loft with City View",
-    location: "Arts District, Metro City",
-    price: 650000,
-    image:
-      "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&q=80&w=800",
-    beds: 2,
-    baths: 2,
-    sqft: 1400,
-    status: "Available",
-  },
-  {
-    id: 5,
-    title: "Suburban Family Home",
-    location: "Maple Grove, Suburbia",
-    price: 480000,
-    image:
-      "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&q=80&w=800",
-    beds: 4,
-    baths: 2.5,
-    sqft: 2800,
-    status: "Escrow",
-  },
-  {
-    id: 6,
-    title: "Mountain Retreat Cabin",
-    location: "Alpine Heights, Mountain State",
-    price: 720000,
-    image:
-      "https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&q=80&w=800",
-    beds: 3,
-    baths: 2,
-    sqft: 1800,
-    status: "Available",
-  },
-];
+const GATEWAY_URL = import.meta.env.VITE_PINATA_GATEWAY;
 
 export default function Marketplace() {
-  const { properties, loading, fetchAvailableProperties } =
-    useFetchProperties();
+  const { fetchAllProperties } = useFetchProperties();
+  const [properties, setProperties] = useState([]);
   const [displayedProperties, setDisplayedProperties] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState("all"); // all, buy (sale), rent
   const [searchLocation, setSearchLocation] = useState("");
   const [minPrice, setMinPrice] = useState("");
@@ -97,12 +25,52 @@ export default function Marketplace() {
 
   const loadProperties = async () => {
     try {
-      const props = await fetchAvailableProperties();
-      setDisplayedProperties(props);
-    } catch (err) {
-      console.error("Failed to load properties:", err);
-      // Fallback to mock data if blockchain fetch fails
-      setDisplayedProperties(ALL_PROPERTIES);
+      setLoading(true);
+      const props = await fetchAllProperties();
+
+      // Transform blockchain data to UI format
+      const formattedProps = props
+        .filter((p) => p.status === 1 || p.status === 2) // Available or In Escrow
+        .map((p) => ({
+          id: p.id,
+          title: p.description
+            ? p.description.substring(0, 50) +
+              (p.description.length > 50 ? "..." : "")
+            : `Property #${p.id}`,
+          location: p.property_address || "Location not specified",
+          price: parseInt(p.price || 0) / 100_000_000,
+          rentPrice: p.monthly_rent
+            ? parseInt(p.monthly_rent) / 100_000_000
+            : 0,
+          image:
+            p.images_cids && p.images_cids.length > 0
+              ? `https://${GATEWAY_URL}/ipfs/${p.images_cids[0]}`
+              : "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800",
+          beds: 3,
+          baths: 2,
+          sqft: 2200,
+          status:
+            p.status === 1
+              ? "Available"
+              : p.status === 2
+              ? "In Escrow"
+              : p.status === 3
+              ? "Sold"
+              : "Rented",
+          listingType: p.listing_type,
+          propertyType: p.property_type,
+          owner: p.owner,
+        }));
+
+      setProperties(formattedProps);
+      setDisplayedProperties(formattedProps);
+    } catch (error) {
+      console.error("Failed to fetch properties:", error);
+      toast.error("Failed to load properties");
+      setProperties([]);
+      setDisplayedProperties([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -167,9 +135,9 @@ export default function Marketplace() {
               All
             </button>
             <button
-              onClick={() => setFilterType("sale")}
+              onClick={() => setFilterType("buy")}
               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                filterType === "sale"
+                filterType === "buy"
                   ? "bg-white text-slate-900 shadow-sm"
                   : "text-slate-500 hover:text-slate-900"
               }`}
@@ -243,26 +211,24 @@ export default function Marketplace() {
             <div className="flex justify-center items-center py-12">
               <Loader className="animate-spin text-primary" size={32} />
             </div>
-          ) : filteredProperties.length === 0 ? (
+          ) : displayedProperties.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-slate-500 text-lg">No properties found</p>
-              {displayedProperties.length === 0 && (
-                <p className="text-slate-400 text-sm mt-2">
-                  Try refreshing to load properties from the blockchain
-                </p>
-              )}
+              <p className="text-slate-400 text-sm mt-2">
+                Try adjusting your filters or list a new property
+              </p>
             </div>
           ) : (
             <>
               <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {filteredProperties.map((p) => (
+                {displayedProperties.map((p) => (
                   <PropertyCard key={p.id} property={p} />
                 ))}
               </div>
 
               <div className="mt-8 text-center text-sm text-slate-500">
-                Showing {filteredProperties.length} of{" "}
-                {displayedProperties.length} properties
+                Showing {displayedProperties.length} of {properties.length}{" "}
+                properties
               </div>
             </>
           )}

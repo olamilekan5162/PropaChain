@@ -10,34 +10,90 @@ import {
 import Jazzicon from "react-jazzicon";
 import { useMovementWallet } from "../hooks/useMovementWallet";
 import { useReceipts } from "../hooks/useReceipts";
+import { useFetchProperties } from "../hooks/useFetchProperties";
 import { Button } from "../components/common/Button";
 import { PropertyCard } from "../components/common/PropertyCard";
 import { ReceiptCard } from "../components/common/ReceiptCard";
-import { PROPERTIES_DATA } from "../utils/mockData";
+
+const GATEWAY_URL = import.meta.env.VITE_PINATA_GATEWAY;
 
 export default function Profile() {
   const { walletAddress } = useMovementWallet();
   const { receipts, loading, error, getUserReceipts } = useReceipts();
+  const { fetchPropertiesByOwner } = useFetchProperties();
   const [activeTab, setActiveTab] = useState("listings");
   const [copied, setCopied] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
+  const [myListings, setMyListings] = useState([]);
+  const [loadingProperties, setLoadingProperties] = useState(false);
 
-  // Fetch receipts when component mounts or wallet address changes
+  // Fetch receipts and properties when component mounts or wallet address changes
   useEffect(() => {
     if (walletAddress) {
       getUserReceipts();
+      loadMyProperties();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletAddress]);
+
+  const loadMyProperties = async () => {
+    try {
+      setLoadingProperties(true);
+      const props = await fetchPropertiesByOwner(walletAddress);
+      const formatted = props.map((p) => ({
+        id: p.id,
+        title: p.description
+          ? p.description.substring(0, 50) +
+            (p.description.length > 50 ? "..." : "")
+          : `Property #${p.id}`,
+        location: p.property_address || "Location not specified",
+        price: parseInt(p.price || 0) / 100_000_000,
+        image:
+          p.images_cids && p.images_cids.length > 0
+            ? `https://${GATEWAY_URL}/ipfs/${p.images_cids[0]}`
+            : "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800",
+        beds: 3,
+        baths: 2,
+        sqft: 2200,
+        status:
+          p.status === 1
+            ? "Available"
+            : p.status === 2
+            ? "In Escrow"
+            : p.status === 3
+            ? "Sold"
+            : "Rented",
+      }));
+      setMyListings(formatted);
+    } catch (error) {
+      console.error("Failed to load properties:", error);
+      setMyListings([]);
+    } finally {
+      setLoadingProperties(false);
+    }
+  };
 
   const handleViewDetails = (receipt) => {
     setSelectedReceipt(receipt);
   };
 
   const handleDownload = (receipt) => {
+    // Determine status
+    const getStatus = () => {
+      if (receipt.is_disputed) return "Dispute Raised";
+      if (receipt.buyer_confirmed && receipt.seller_confirmed)
+        return "Completed";
+      if (receipt.buyer_confirmed || receipt.seller_confirmed)
+        return "Partially Confirmed";
+      return "Awaiting Confirmation";
+    };
+
     // Generate receipt data as JSON
     const receiptData = {
-      escrowId: receipt.escrow_id,
+      receiptId: receipt.id,
+      escrowId: receipt.escrowId,
       property: {
+        id: receipt.property_id,
         address: receipt.property_address,
         type: receipt.property_type,
         listingType: receipt.listingType,
@@ -51,11 +107,12 @@ export default function Profile() {
         buyerRenter: receipt.buyer_renter_address,
         sellerLandlord: receipt.seller_landlord_address,
       },
-      status: receipt.status,
+      status: getStatus(),
       confirmations: {
-        buyer: receipt.buyer_confirmed,
-        seller: receipt.seller_confirmed,
+        buyer: receipt.buyer_confirmed || false,
+        seller: receipt.seller_confirmed || false,
       },
+      disputed: receipt.is_disputed || false,
     };
 
     // Create and download JSON file
@@ -64,7 +121,7 @@ export default function Profile() {
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `receipt-${receipt.escrow_id}.json`;
+    link.download = `receipt-${receipt.id}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -91,9 +148,6 @@ export default function Profile() {
       </div>
     );
   }
-
-  // Mock Data for the profile
-  const MY_LISTINGS = Object.values(PROPERTIES_DATA); // Using all mock properties as "my listings" for demo
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -213,11 +267,32 @@ export default function Profile() {
               <h3 className="text-lg font-bold text-slate-900">
                 My Properties
               </h3>
-              <div className="grid md:grid-cols-2 gap-6">
-                {MY_LISTINGS.map((p) => (
-                  <PropertyCard key={p.id} property={p} />
-                ))}
-              </div>
+              {loadingProperties ? (
+                <div className="flex justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                </div>
+              ) : myListings.length === 0 ? (
+                <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-200">
+                  <Building2
+                    size={48}
+                    className="text-slate-300 mx-auto mb-4"
+                  />
+                  <p className="text-slate-500 mb-4">
+                    No properties listed yet
+                  </p>
+                  <Button
+                    onClick={() => (window.location.href = "/app/upload")}
+                  >
+                    Create Your First Listing
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-6">
+                  {myListings.map((p) => (
+                    <PropertyCard key={p.id} property={p} />
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -369,9 +444,38 @@ export default function Profile() {
                 <h3 className="font-semibold text-slate-900 text-sm">Status</h3>
                 <div className="bg-slate-50 rounded-lg p-4 space-y-2 text-sm">
                   <p className="text-slate-600">Current Status</p>
-                  <div className="inline-block px-3 py-1.5 rounded-full text-xs font-medium border border-slate-200 bg-white text-slate-900">
-                    {selectedReceipt.status}
+                  <div
+                    className={`inline-block px-3 py-1.5 rounded-full text-xs font-medium border ${
+                      selectedReceipt.is_disputed
+                        ? "bg-red-100 border-red-200 text-red-800"
+                        : selectedReceipt.buyer_confirmed &&
+                          selectedReceipt.seller_confirmed
+                        ? "bg-green-100 border-green-200 text-green-800"
+                        : selectedReceipt.buyer_confirmed ||
+                          selectedReceipt.seller_confirmed
+                        ? "bg-blue-100 border-blue-200 text-blue-800"
+                        : "bg-yellow-100 border-yellow-200 text-yellow-800"
+                    }`}
+                  >
+                    {selectedReceipt.is_disputed
+                      ? "Dispute Raised"
+                      : selectedReceipt.buyer_confirmed &&
+                        selectedReceipt.seller_confirmed
+                      ? "Completed"
+                      : selectedReceipt.buyer_confirmed ||
+                        selectedReceipt.seller_confirmed
+                      ? "Partially Confirmed"
+                      : "Awaiting Confirmation"}
                   </div>
+
+                  {selectedReceipt.escrowId && (
+                    <div className="mt-3">
+                      <p className="text-slate-600 mb-1">Escrow ID</p>
+                      <p className="font-mono text-xs text-slate-900 break-all">
+                        {selectedReceipt.escrowId}
+                      </p>
+                    </div>
+                  )}
 
                   <div className="mt-3 space-y-2">
                     <div className="flex items-center justify-between">

@@ -76,7 +76,7 @@ export const useFetchProperties = () => {
       const property = await aptos.view({
         payload: {
           function: `${MOVEMENT_CONTRACT_ADDRESS}::propachain::get_property`,
-          functionArguments: [MOVEMENT_CONTRACT_ADDRESS, propertyId.toString()],
+          functionArguments: [MOVEMENT_CONTRACT_ADDRESS, propertyId],
           typeArguments: [],
         },
       });
