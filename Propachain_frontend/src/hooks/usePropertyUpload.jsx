@@ -135,7 +135,7 @@ export const usePropertyUpload = () => {
       console.log("Upload successful:", result);
 
       // Navigate to profile after successful upload
-      setTimeout(() => navigate(`/profile`), 1500);
+      setTimeout(() => navigate(`/app/my-properties`), 1500);
 
       return true;
     } catch (error) {

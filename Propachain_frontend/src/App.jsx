@@ -11,9 +11,12 @@ import Transactions from "./pages/Transactions";
 import MyProperties from "./pages/MyProperties";
 import { RegistrationGuard } from "./components/RegistrationGuard";
 
+import { Toaster } from "react-hot-toast";
+
 function App() {
   return (
     <Router>
+      <Toaster position="top-right" />
       <RegistrationGuard>
         <Routes>
           {/* Public Routes with Header Navigation */}

@@ -366,13 +366,20 @@ module propachain::propachain {
     ) acquires PropertyListingsStore {
         assert!(listing_type == LISTING_TYPE_SALE || listing_type == LISTING_TYPE_RENT, E_INVALID_LISTING_TYPE);
 
+        // ✅ FIX: Register seller for AptosCoin if not already registered
+        // This ensures the seller can receive payments when escrow is released
+        let seller_address = signer::address_of(account);
+        if (!coin::is_account_registered<AptosCoin>(seller_address)) {
+            coin::register<AptosCoin>(account);
+        };
+
         let store = borrow_global_mut<PropertyListingsStore>(store_addr);
         let property_id = store.next_id;
         store.next_id = store.next_id + 1;
 
         let listing = PropertyListing {
             id: property_id,
-            owner: signer::address_of(account),
+            owner: seller_address,
             listing_type,
             price,
             monthly_rent,
@@ -572,16 +579,16 @@ module propachain::propachain {
         assert!(!escrow.resolved, E_ALREADY_RESOLVED);
         assert!(escrow.buyer_renter_confirmed && escrow.seller_landlord_confirmed, E_ESCROW_NOT_CONFIRMED);
 
-        // Register seller for AptosCoin if needed
-        if (!coin::is_account_registered<AptosCoin>(escrow.seller_landlord)) {
-            abort E_NOT_AUTHORIZED
-        };
+        // ✅ FIX: Check that seller is registered for AptosCoin
+        // This should always pass now because we register sellers in list_property
+        assert!(coin::is_account_registered<AptosCoin>(escrow.seller_landlord), E_NOT_AUTHORIZED);
 
         // Extract payment and transfer to seller
         let escrow_funds = borrow_global_mut<EscrowFunds>(escrow_store_addr);
         let (_, payment) = simple_map::remove(&mut escrow_funds.funds, &escrow_id);
         let amount = coin::value(&payment);
         
+        // ✅ Transfer funds to seller
         coin::deposit(escrow.seller_landlord, payment);
 
         let current_time = timestamp::now_seconds();
@@ -607,10 +614,10 @@ module propachain::propachain {
             property.rental_end_date = option::some(end_date);
             property.status = STATUS_RENTED;
 
-            // Update receipts with rental dates - do this after we're done with escrow borrow
+            // Mark escrow resolved BEFORE updating receipts
             escrow.resolved = true;
             
-            // Now update receipts (this will borrow ReceiptStore, not EscrowStore)
+            // Now update receipts
             if (option::is_some(&buyer_receipt_id_opt)) {
                 let buyer_receipt_id = *option::borrow(&buyer_receipt_id_opt);
                 let receipt_store = borrow_global_mut<ReceiptStore>(escrow_store_addr);
@@ -627,10 +634,13 @@ module propachain::propachain {
                 seller_receipt.rental_end_date = option::some(end_date);
             };
         } else {
+            // ✅ For SALE: Transfer ownership to buyer
+            property.owner = escrow.buyer_renter;
             property.status = STATUS_COMPLETED;
             escrow.resolved = true;
         };
 
+        // ✅ Clear property locks
         property.locked_by = option::none();
         property.escrow_id = option::none();
 
@@ -721,10 +731,8 @@ module propachain::propachain {
         assert!(!escrow.resolved, E_ALREADY_RESOLVED);
         assert!(escrow.dispute_raised, E_NO_DISPUTE);
 
-        // Register seller for AptosCoin if needed
-        if (!coin::is_account_registered<AptosCoin>(escrow.seller_landlord)) {
-            abort E_NOT_AUTHORIZED
-        };
+        // ✅ Check seller is registered for AptosCoin
+        assert!(coin::is_account_registered<AptosCoin>(escrow.seller_landlord), E_NOT_AUTHORIZED);
 
         // Extract and transfer payment
         let escrow_funds = borrow_global_mut<EscrowFunds>(escrow_store_addr);
@@ -776,6 +784,7 @@ module propachain::propachain {
                 seller_receipt.rental_end_date = option::some(end_date);
             };
         } else {
+            property.owner = escrow.buyer_renter;
             property.status = STATUS_COMPLETED;
             escrow.resolved = true;
         };
