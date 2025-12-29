@@ -71,7 +71,7 @@ const WalletModal = ({ isOpen, onClose }) => {
                   Login with Privy
                 </span>
                 <span className="block text-sm text-zinc-600">
-                  Email, Google, Twitter & more
+                  Email, Google & more
                 </span>
               </div>
             </button>

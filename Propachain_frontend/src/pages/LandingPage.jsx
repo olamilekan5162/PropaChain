@@ -114,7 +114,47 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Featured Properties */}
+      <section className="py-20 bg-zinc-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-end mb-12">
+            <div>
+              <h2 className="text-3xl font-semibold text-zinc-900 mb-3">
+                Featured Properties
+              </h2>
+              <p className="text-zinc-600">
+                Explore our exclusive property listings
+              </p>
+            </div>
+            <Link
+              to="/marketplace"
+              className="text-teal-700 font-medium hover:text-teal-800 transition-colors flex items-center gap-1"
+            >
+              View All <ArrowRight size={18} />
+            </Link>
+          </div>
+
+          {featuredProperties.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {featuredProperties.map((property) => (
+                <PropertyCard key={property.id} property={property} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16 bg-white rounded-lg border border-zinc-200">
+              <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Home className="w-8 h-8 text-zinc-400" />
+              </div>
+              <p className="text-zinc-600 mb-6">No properties available yet</p>
+              <Link to="/app/upload">
+                <Button>List Your First Property</Button>
+              </Link>
+            </div>
+          )}
+        </div>
+      </section>
+
+       {/* Features Section */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -167,46 +207,6 @@ export default function LandingPage() {
               </p>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* Featured Properties */}
-      <section className="py-20 bg-zinc-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-end mb-12">
-            <div>
-              <h2 className="text-3xl font-semibold text-zinc-900 mb-3">
-                Featured Properties
-              </h2>
-              <p className="text-zinc-600">
-                Explore our exclusive property listings
-              </p>
-            </div>
-            <Link
-              to="/marketplace"
-              className="text-teal-700 font-medium hover:text-teal-800 transition-colors flex items-center gap-1"
-            >
-              View All <ArrowRight size={18} />
-            </Link>
-          </div>
-
-          {featuredProperties.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {featuredProperties.map((property) => (
-                <PropertyCard key={property.id} property={property} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16 bg-white rounded-lg border border-zinc-200">
-              <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Home className="w-8 h-8 text-zinc-400" />
-              </div>
-              <p className="text-zinc-600 mb-6">No properties available yet</p>
-              <Link to="/app/upload">
-                <Button>List Your First Property</Button>
-              </Link>
-            </div>
-          )}
         </div>
       </section>
 

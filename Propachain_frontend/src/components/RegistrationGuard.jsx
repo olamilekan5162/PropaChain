@@ -5,7 +5,7 @@ import { RegistrationModal } from "./features/RegistrationModal";
 import { Loader2 } from "lucide-react";
 
 export const RegistrationGuard = ({ children }) => {
-  const { isConnected } = useMovementWallet();
+  const { isConnected, walletAddress, disconnectWallet } = useMovementWallet();
   const { isRegistered, checking, registerUser, loading } = useUserProfile();
   const [showModal, setShowModal] = useState(false);
 
@@ -16,7 +16,7 @@ export const RegistrationGuard = ({ children }) => {
     } else {
       setShowModal(false);
     }
-  }, [isConnected, checking, isRegistered]);
+  }, [isConnected, checking, isRegistered, walletAddress]);
 
   const handleRegister = async (userData) => {
     const success = await registerUser(userData);
@@ -24,6 +24,14 @@ export const RegistrationGuard = ({ children }) => {
       setShowModal(false);
     }
     return success;
+  };
+
+  const handleClose = async () => {
+    if (!isRegistered) {
+      // If closing while unregistered, disconnect the wallet to reset state
+      await disconnectWallet();
+    }
+    setShowModal(false);
   };
 
   // Show loading while checking registration
@@ -51,13 +59,7 @@ export const RegistrationGuard = ({ children }) => {
       {children}
       <RegistrationModal
         isOpen={showModal}
-        onClose={() => {
-          // Don't allow closing if not registered
-          if (!isRegistered) {
-            return;
-          }
-          setShowModal(false);
-        }}
+        onClose={handleClose}
         onRegister={handleRegister}
         loading={loading}
       />
