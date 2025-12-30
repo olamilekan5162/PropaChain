@@ -12,6 +12,7 @@ import {
   FileText,
   ArrowLeftRight,
   Search,
+  ShoppingCart,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { clsx } from "clsx";
@@ -101,17 +102,20 @@ export default function DashboardLayout() {
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          <SidebarLink to="/marketplace" icon={ShoppingCart}>
+            Marketplace
+          </SidebarLink>
           <SidebarLink to="/app" icon={Home}>
             Dashboard
           </SidebarLink>
           <SidebarLink to="/app/my-properties" icon={Building2}>
             My Properties
           </SidebarLink>
-          <SidebarLink to="/app/transactions" icon={ArrowLeftRight}>
-            Transactions
-          </SidebarLink>
           <SidebarLink to="/app/upload" icon={UploadCloud}>
             List Property
+          </SidebarLink>
+          <SidebarLink to="/app/transactions" icon={ArrowLeftRight}>
+            Transactions
           </SidebarLink>
           <SidebarLink to="/app/profile" icon={User}>
             Profile

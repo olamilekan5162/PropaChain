@@ -32,14 +32,18 @@ export default function PublicLayout() {
                 to="/marketplace"
                 className="text-zinc-700 hover:text-teal-700 font-medium transition-colors"
               >
-                Browse Properties
+                Marketplace
               </Link>
-              <Link
-                to="/about"
-                className="text-zinc-700 hover:text-teal-700 font-medium transition-colors"
-              >
-                How It Works
-              </Link>
+              {!walletAddress ? (
+                <div></div>
+              ) : (
+                <Link
+                  to="/app"
+                  className="text-zinc-700 hover:text-teal-700 font-medium transition-colors"
+                >
+                  Dashboard
+                </Link>
+              )}
             </nav>
 
             {/* Actions */}
@@ -65,13 +69,13 @@ export default function PublicLayout() {
                 </>
               ) : (
                 <div className="flex items-center gap-3">
-                  <Button
+                  {/* <Button
                     variant="secondary"
                     size="sm"
                     onClick={() => navigate("/app")}
                   >
                     Dashboard
-                  </Button>
+                  </Button> */}
                   <button
                     onClick={() => navigate("/app/profile")}
                     className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-zinc-50 transition-colors"
