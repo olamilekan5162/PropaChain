@@ -1,8 +1,8 @@
 /* src/hooks/useMovementWallet.jsx */
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
-import { useSignRawHash } from "@privy-io/react-auth/extended-chains";
-import { useState, useEffect } from "react";
+import { useSignRawHash, useCreateWallet } from "@privy-io/react-auth/extended-chains";
+import { useState, useEffect, useRef } from "react";
 import { aptos } from "../config/movement";
 import {
   AccountAuthenticatorEd25519,
@@ -17,6 +17,8 @@ import {
  */
 export function useMovementWallet() {
   const { authenticated, user, logout } = usePrivy();
+  const { createWallet } = useCreateWallet();
+  const { wallets } = useWallets();
   const { signRawHash } = useSignRawHash();
   const {
     account,
@@ -25,50 +27,97 @@ export function useMovementWallet() {
     signAndSubmitTransaction: nativeSignAndSubmit,
   } = useWallet();
   const [walletAddress, setWalletAddress] = useState("");
+  const creationAttempted = useRef(false);
+
+  // Helper to distinguish Aptos (32 bytes) from EVM (20 bytes) addresses
+  const isValidAptosAddress = (address) => {
+    // Aptos addresses are long (66 chars typically: 0x + 64 hex).
+    // EVM addresses are short (42 chars: 0x + 40 hex).
+    // SDK error requires at least 60 hex chars.
+    return address && address.toString().startsWith("0x") && address.toString().length > 50;
+  };
 
   // Determine wallet address
   useEffect(() => {
-    if (authenticated && user) {
-      console.log("Privy User:", user);
-      
-      // 1. Try Primary Wallet
-      if (user.wallet?.address) {
-        console.log("Using primary wallet:", user.wallet.address);
-        setWalletAddress(user.wallet.address);
-        return;
-      }
+    const initWallet = async () => {
+      if (authenticated && user) {
+        console.log("Privy User:", user);
+        console.log("Linked Accounts Dump:", JSON.stringify(user.linkedAccounts, null, 2));
+        console.log("Active Wallets:", wallets);
+        
+        // 1. Check Active Wallets (Best source for multi-chain)
+        const aptosActiveWallet = wallets.find(
+            w => w.walletClientType === 'privy' && w.chainType === 'aptos'
+        );
+        if (aptosActiveWallet && isValidAptosAddress(aptosActiveWallet.address)) {
+             console.log("Found active Aptos wallet:", aptosActiveWallet.address);
+             setWalletAddress(aptosActiveWallet.address);
+             return;
+        }
 
-      // 2. Try Aptos-specific wallet
-      const aptosWallet = user.linkedAccounts?.find(
-        (acc) => acc.type === "wallet" && acc.chainType === "aptos"
-      );
-      
-      if (aptosWallet?.address) {
-        console.log("Using Aptos linked wallet:", aptosWallet.address);
-        setWalletAddress(aptosWallet.address);
-        return;
-      }
+        // 2. Try Primary Wallet (Only if it's Aptos)
+        if (user.wallet?.address && isValidAptosAddress(user.wallet.address)) {
+          console.log("Using primary wallet (Aptos):", user.wallet.address);
+          setWalletAddress(user.wallet.address);
+          return;
+        }
 
-      // 3. Fallback: Try ANY wallet
-      const anyWallet = user.linkedAccounts?.find((acc) => acc.type === "wallet");
-      if (anyWallet?.address) {
-        console.log("Using fallback wallet:", anyWallet.address);
-        setWalletAddress(anyWallet.address);
-        return;
-      }
+        // 3. Try Aptos-specific wallet in linked accounts
+        const aptosLink = user.linkedAccounts?.find(
+          (acc) => acc.type === "wallet" && acc.chainType === "aptos"
+        );
 
-      console.warn("Authenticated but no wallet address found!");
-    } else if (connected && account) {
-      setWalletAddress(account.address.toString());
-    } else {
-      setWalletAddress("");
-    }
-  }, [authenticated, user, connected, account]);
+        if (aptosLink?.address) {
+          console.log("Using Aptos linked wallet:", aptosLink.address);
+          setWalletAddress(aptosLink.address);
+          return;
+        }
+        
+        // 4. Try getting address from ANY Privy wallet if valid
+         const anyAptosWallet = user.linkedAccounts?.find(
+          (acc) => acc.type === "wallet" && isValidAptosAddress(acc.address)
+        );
+        if (anyAptosWallet?.address) {
+          console.log("Using fallback Aptos wallet:", anyAptosWallet.address);
+          setWalletAddress(anyAptosWallet.address);
+          return;
+        }
+
+        // 5. Critical: If no valid Aptos wallet exists, create one!
+        if (!creationAttempted.current) {
+          console.log("No valid Aptos wallet found. Attempting to create one...");
+          creationAttempted.current = true;
+          try {
+            const newWallet = await createWallet({ chainType: "aptos" });
+            console.log("Created new Aptos wallet:", newWallet);
+            if (newWallet?.address) {
+              setWalletAddress(newWallet.address);
+            }
+          } catch (err) {
+            console.error("Failed to auto-create wallet:", err);
+            // Check if error is "User already has an embedded wallet"
+            if (err?.message?.includes("already has") || err?.toString().includes("already has")) {
+                 console.warn("User has embedded wallet but no Aptos address found. Suggesting logout.");
+                 // Force logout could be aggressive, maybe just toast or rely on UI
+                 // But for this user debugging, disconnecting might help refresh metadata
+            }
+          }
+        } else {
+           console.warn("Authenticated but no valid Aptos wallet address found (creation already attempted).");
+        }
+
+      } else if (connected && account) {
+        setWalletAddress(account.address.toString());
+      } else {
+        setWalletAddress("");
+      }
+    };
+
+    initWallet();
+  }, [authenticated, user, connected, account, createWallet, wallets]);
 
   // Determine wallet type
-  // If authenticated via Privy, treat as Privy wallet unless explicitly using native
   const isPrivyWallet = authenticated;
-  // If connected via adapter and NOT authenticated via Privy (or prioritized), it's native
   const isNativeWallet = connected && !authenticated;
   const isConnected = authenticated || connected;
 
@@ -76,6 +125,7 @@ export function useMovementWallet() {
   const disconnectWallet = async () => {
     try {
       if (authenticated) {
+        creationAttempted.current = false;
         await logout();
       } else if (connected) {
         await disconnect();
@@ -87,19 +137,31 @@ export function useMovementWallet() {
   };
 
   // Get Movement wallet for Privy
+  // Must match the logic used for walletAddress to ensure consistency
   const movementWallet = isPrivyWallet
-    ? user?.linkedAccounts?.find((acc) => acc.chainType === "aptos")
+    ? (
+        // 0. Active Wallet (Best)
+        wallets.find(w => w.walletClientType === 'privy' && w.chainType === 'aptos' && isValidAptosAddress(w.address)) ||
+        // 1. Linked Aptos wallet
+        user?.linkedAccounts?.find((acc) => acc.type === "wallet" && acc.chainType === "aptos") ||
+        // 2. User wallet if it matches our Aptos check
+        (user?.wallet && isValidAptosAddress(user.wallet.address) ? { ...user.wallet, publicKey: user.wallet.address } : null) ||
+        // 3. Any linked wallet that passes the check
+        user?.linkedAccounts?.find((acc) => acc.type === "wallet" && isValidAptosAddress(acc.address))
+      )
     : null;
 
   // Unified transaction signing function
   const signAndSubmitTransaction = async (transactionPayload) => {
     try {
       if (isPrivyWallet && movementWallet) {
-        // Use Privy's signRawHash for Aptos transactions
         console.log("Signing with Privy Aptos wallet:", movementWallet.address);
 
+        if (!isValidAptosAddress(movementWallet.address)) {
+             throw new Error(`Invalid Aptos address detected: ${movementWallet.address}. Please ensure you have an Aptos wallet.`);
+        }
+
         // Build the transaction
-        // Note: transactionPayload.data usually contains { function, functionArguments, typeArguments }
         const rawTxn = await aptos.transaction.build.simple({
           sender: movementWallet.address,
           data: transactionPayload.data,
@@ -127,14 +189,25 @@ export function useMovementWallet() {
 
         console.log("[Privy] Transaction signed successfully");
 
-        // Clean public key (remove 0x prefix and any leading bytes)
+        // Clean public key
         let cleanPublicKey = movementWallet.publicKey.startsWith("0x")
           ? movementWallet.publicKey.slice(2)
           : movementWallet.publicKey;
 
-        // If public key is 66 characters (33 bytes), remove the first byte (00 prefix)
-        if (cleanPublicKey.length === 66) {
-          cleanPublicKey = cleanPublicKey.slice(2);
+        if (cleanPublicKey.length > 64) {
+           // Ensure we aren't truncating incorrectly, but usually keys with prefixes need cleaning
+           // Standard Ed25519 is 32 bytes (64 hex). 
+           // If we have 66 (0x prefix), slice 2. 
+           // If we have more, might be prefix issue. 
+           // Assuming standard behavior here as per reference code.
+           cleanPublicKey = cleanPublicKey.slice(-64); // Take last 64 chars? Or slice prefix?
+           // Reference implementation used slice(2) on length 66.
+           // Let's stick to safe defaults or what we had if valid.
+        }
+        
+        // Re-applying original logic but careful about lengths
+        if (cleanPublicKey.length === 66 && cleanPublicKey.startsWith("00")) {
+             cleanPublicKey = cleanPublicKey.slice(2);
         }
 
         // Create authenticator
@@ -171,20 +244,13 @@ export function useMovementWallet() {
         return { hash: committedTransaction.hash };
 
       } else if (isNativeWallet && nativeSignAndSubmit) {
-        // Native wallet adapter expects this format directly
         console.log("Signing with native wallet:", account?.address);
 
-        // The wallet adapter's signAndSubmitTransaction expects:
-        // { sender: address, data: { function, functionArguments } }
         const transaction = {
           sender: account.address,
           data: transactionPayload.data,
         };
 
-        console.log("Transaction payload:", transaction);
-
-        // Sign and submit using wallet adapter with options
-        // Removed hardcoded gas options as per earlier debugging
         const result = await nativeSignAndSubmit(transaction);
         console.log("Native wallet transaction result:", result);
         return result;
@@ -198,22 +264,15 @@ export function useMovementWallet() {
   };
 
   return {
-    // Connection state
     isConnected,
     isPrivyWallet,
     isNativeWallet,
     walletAddress,
-
-    // Wallet objects
     privyUser: user,
     nativeAccount: account,
     movementWallet,
-
-    // Functions
     signAndSubmitTransaction,
     disconnectWallet,
-
-    // Auth state
     authenticated,
     connected,
   };

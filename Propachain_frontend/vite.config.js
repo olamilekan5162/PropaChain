@@ -5,4 +5,13 @@ import tailwindcss from "@tailwindcss/vite";
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: {
+    proxy: {
+      "/faucet-api": {
+        target: "https://faucet.movementnetwork.xyz",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/faucet-api/, ""),
+      },
+    },
+  },
 });

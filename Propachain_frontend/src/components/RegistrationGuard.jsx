@@ -8,15 +8,23 @@ export const RegistrationGuard = ({ children }) => {
   const { isConnected, walletAddress, disconnectWallet } = useMovementWallet();
   const { isRegistered, checking, registerUser, loading } = useUserProfile();
   const [showModal, setShowModal] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    // Show registration modal if user is connected but not registered
-    if (isConnected && !checking && !isRegistered) {
+    // Reset dismissed state when wallet disconnects
+    if (!isConnected) {
+      setDismissed(false);
+    }
+  }, [isConnected]);
+
+  useEffect(() => {
+    // Show registration modal if user is connected, not registered, and hasn't dismissed it
+    if (isConnected && !checking && !isRegistered && !dismissed) {
       setShowModal(true);
     } else {
       setShowModal(false);
     }
-  }, [isConnected, checking, isRegistered, walletAddress]);
+  }, [isConnected, checking, isRegistered, walletAddress, dismissed]);
 
   const handleRegister = async (userData) => {
     const success = await registerUser(userData);
@@ -27,10 +35,8 @@ export const RegistrationGuard = ({ children }) => {
   };
 
   const handleClose = async () => {
-    if (!isRegistered) {
-      // If closing while unregistered, disconnect the wallet to reset state
-      await disconnectWallet();
-    }
+    // Just close the modal and mark as dismissed so it doesn't pop up again this session
+    setDismissed(true);
     setShowModal(false);
   };
 
