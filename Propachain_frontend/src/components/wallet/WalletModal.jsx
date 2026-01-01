@@ -60,7 +60,8 @@ const WalletModal = ({ isOpen, onClose }) => {
           <div className="space-y-3">
             {/* Privy Login */}
             <button
-              onClick={login}
+              // onClick={login}
+              onClick={() => login({ loginMethods: ["email", "google"] })}
               className="w-full flex items-center gap-4 p-4 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-lg transition-all group"
             >
               <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shrink-0 shadow-lg shadow-purple-500/30 group-hover:shadow-purple-500/40 transition-shadow">
