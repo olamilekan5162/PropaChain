@@ -15,7 +15,28 @@ const WalletModal = ({ isOpen, onClose }) => {
     }
   }, [connected, authenticated, onClose]);
 
+
+  const filteredWallets = wallets
+    ?.filter((wallet) => {
+      const name = wallet.name.toLowerCase();
+      return (
+        !name.includes("petra") &&
+        !name.includes("google") &&
+        !name.includes("apple")
+      );
+    })
+    .filter((wallet, index, self) => {
+      return index === self.findIndex((w) => w.name === wallet.name);
+    })
+    .sort((a, b) => {
+      if (a.name.toLowerCase().includes("nightly")) return -1;
+      if (b.name.toLowerCase().includes("nightly")) return 1
+      return 0;
+    });
+
   if (!isOpen) return null;
+
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -90,7 +111,7 @@ const WalletModal = ({ isOpen, onClose }) => {
             </div>
 
             {/* Movement Wallets */}
-            {wallets?.map((wallet) => (
+            {filteredWallets?.map((wallet) => (
               <button
                 key={wallet.name}
                 onClick={() => connect(wallet.name)}

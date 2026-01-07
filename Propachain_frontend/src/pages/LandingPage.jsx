@@ -48,7 +48,7 @@ export default function LandingPage() {
           <div className="text-center max-w-3xl mx-auto">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-teal-50 text-teal-700 text-sm font-medium mb-6">
               <span className="w-2 h-2 rounded-full bg-teal-500"></span>
-              Live on Movement Mainnet
+              Live on Movement Blockchain
             </div>
 
             <h1 className="text-5xl md:text-6xl font-semibold text-zinc-900 mb-6 tracking-tight">
