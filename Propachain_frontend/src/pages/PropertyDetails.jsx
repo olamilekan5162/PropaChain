@@ -718,21 +718,19 @@ export default function PropertyDetails() {
                 <span>Send Message</span>
               </button>
 
-              {!escrowData.isActive && (
-                <>
-                  <div className="my-4 border-t border-gray-200"></div>
-                  <button
-                    onClick={() => navigate("/app/wallet")}
-                    className="w-full px-4 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Wallet className="w-5 h-5" />
-                    <span>Buy with Escrow</span>
-                  </button>
-                  <p className="text-xs text-gray-500 text-center mt-2">
-                    Protected by blockchain smart contract
-                  </p>
-                </>
-              )}
+              <div className="my-4 border-t border-gray-200"></div>
+              
+              <button
+                onClick={() => navigate("/app/wallet")}
+                className="w-full px-4 py-3 bg-teal-700 text-white rounded-lg font-semibold hover:bg-teal-800 transition-colors flex items-center justify-center gap-2 mb-3"
+              >
+                <Wallet className="w-5 h-5" />
+                <span>Buy Property</span>
+              </button>
+              
+              <p className="text-xs text-gray-500 text-center">
+                Protected by blockchain smart contract
+              </p>
             </div>
           </div>
         </div>
