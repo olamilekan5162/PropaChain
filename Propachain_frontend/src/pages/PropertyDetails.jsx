@@ -719,9 +719,9 @@ export default function PropertyDetails() {
               </button>
 
               <div className="my-4 border-t border-gray-200"></div>
-              
+
               {/* Primary Action Button based on property type */}
-              {property.type === 'sale' && (
+              {property.type === "sale" && (
                 <button
                   onClick={() => navigate("/app/wallet")}
                   className="w-full px-4 py-3 bg-teal-700 text-white rounded-lg font-semibold hover:bg-teal-800 transition-colors flex items-center justify-center gap-2 mb-3"
@@ -730,8 +730,8 @@ export default function PropertyDetails() {
                   <span>Buy Property</span>
                 </button>
               )}
-              
-              {property.type === 'rent' && (
+
+              {property.type === "rent" && (
                 <button
                   onClick={() => navigate("/app/wallet")}
                   className="w-full px-4 py-3 bg-teal-700 text-white rounded-lg font-semibold hover:bg-teal-800 transition-colors flex items-center justify-center gap-2 mb-3"
@@ -740,8 +740,8 @@ export default function PropertyDetails() {
                   <span>Rent Property</span>
                 </button>
               )}
-              
-              {property.type === 'short-let' && (
+
+              {property.type === "short-let" && (
                 <button
                   onClick={() => navigate("/app/wallet")}
                   className="w-full px-4 py-3 bg-teal-700 text-white rounded-lg font-semibold hover:bg-teal-800 transition-colors flex items-center justify-center gap-2 mb-3"
@@ -750,7 +750,7 @@ export default function PropertyDetails() {
                   <span>Book Short-Let</span>
                 </button>
               )}
-              
+
               <p className="text-xs text-gray-500 text-center">
                 Protected by blockchain smart contract
               </p>
