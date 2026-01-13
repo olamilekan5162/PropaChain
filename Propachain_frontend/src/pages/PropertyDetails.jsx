@@ -720,13 +720,36 @@ export default function PropertyDetails() {
 
               <div className="my-4 border-t border-gray-200"></div>
               
-              <button
-                onClick={() => navigate("/app/wallet")}
-                className="w-full px-4 py-3 bg-teal-700 text-white rounded-lg font-semibold hover:bg-teal-800 transition-colors flex items-center justify-center gap-2 mb-3"
-              >
-                <Wallet className="w-5 h-5" />
-                <span>Buy Property</span>
-              </button>
+              {/* Primary Action Button based on property type */}
+              {property.type === 'sale' && (
+                <button
+                  onClick={() => navigate("/app/wallet")}
+                  className="w-full px-4 py-3 bg-teal-700 text-white rounded-lg font-semibold hover:bg-teal-800 transition-colors flex items-center justify-center gap-2 mb-3"
+                >
+                  <Wallet className="w-5 h-5" />
+                  <span>Buy Property</span>
+                </button>
+              )}
+              
+              {property.type === 'rent' && (
+                <button
+                  onClick={() => navigate("/app/wallet")}
+                  className="w-full px-4 py-3 bg-teal-700 text-white rounded-lg font-semibold hover:bg-teal-800 transition-colors flex items-center justify-center gap-2 mb-3"
+                >
+                  <Calendar className="w-5 h-5" />
+                  <span>Rent Property</span>
+                </button>
+              )}
+              
+              {property.type === 'short-let' && (
+                <button
+                  onClick={() => navigate("/app/wallet")}
+                  className="w-full px-4 py-3 bg-teal-700 text-white rounded-lg font-semibold hover:bg-teal-800 transition-colors flex items-center justify-center gap-2 mb-3"
+                >
+                  <Calendar className="w-5 h-5" />
+                  <span>Book Short-Let</span>
+                </button>
+              )}
               
               <p className="text-xs text-gray-500 text-center">
                 Protected by blockchain smart contract
