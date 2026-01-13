@@ -1,107 +1,148 @@
-import { Twitter, Github, Linkedin, Home } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
 
-export const Footer = () => {
+export default function Footer() {
   return (
-    <footer className="bg-zinc-900 text-zinc-300 py-16 border-t border-zinc-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
-          <div className="col-span-1 md:col-span-1">
+    <footer className="hidden md:block bg-gray-900 text-gray-300 py-8 md:py-12">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+          {/* Brand */}
+          <div>
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 bg-teal-700 rounded-lg flex items-center justify-center">
-                <Home className="text-white" size={24} />
+              <div className="w-8 h-8 bg-teal-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-bold text-lg">P</span>
               </div>
-              <span className="text-2xl font-semibold text-white">
-                PropaChain
-              </span>
+              <span className="text-xl font-bold text-white">PropaChain</span>
             </div>
-            <p className="text-sm text-zinc-400 leading-relaxed">
-              Blockchain-powered real estate trading on Movement. Secure, fast,
-              and transparent property transactions.
+            <p className="text-sm text-gray-400 mb-4">
+              Nigeria's trusted blockchain-powered property marketplace.
             </p>
+            <div className="flex gap-3">
+              <a href="#" className="hover:text-white transition-colors">
+                <Facebook className="w-5 h-5" />
+              </a>
+              <a href="#" className="hover:text-white transition-colors">
+                <Twitter className="w-5 h-5" />
+              </a>
+              <a href="#" className="hover:text-white transition-colors">
+                <Instagram className="w-5 h-5" />
+              </a>
+              <a href="#" className="hover:text-white transition-colors">
+                <Linkedin className="w-5 h-5" />
+              </a>
+            </div>
           </div>
 
+          {/* Quick Links */}
           <div>
-            <h4 className="text-white font-semibold mb-4 text-base">
-              Platform
-            </h4>
-            <ul className="space-y-3 text-sm">
+            <h4 className="text-white font-semibold mb-4">Quick Links</h4>
+            <ul className="space-y-2 text-sm">
               <li>
                 <Link
                   to="/marketplace"
-                  className="hover:text-teal-400 transition-colors"
+                  className="hover:text-white transition-colors"
                 >
-                  Marketplace
+                  Browse Properties
                 </Link>
               </li>
               <li>
-                <Link to="/" className="hover:text-teal-400 transition-colors">
-                  How it Works
+                <Link
+                  to="/app/upload"
+                  className="hover:text-white transition-colors"
+                >
+                  List Property
                 </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-teal-400 transition-colors">
-                  Smart Contracts
-                </a>
+                <Link
+                  to="/app/my-properties"
+                  className="hover:text-white transition-colors"
+                >
+                  My Listings
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/app/profile"
+                  className="hover:text-white transition-colors"
+                >
+                  My Account
+                </Link>
               </li>
             </ul>
           </div>
 
+          {/* Categories */}
           <div>
-            <h4 className="text-white font-semibold mb-4 text-base">
-              Resources
-            </h4>
-            <ul className="space-y-3 text-sm">
+            <h4 className="text-white font-semibold mb-4">Categories</h4>
+            <ul className="space-y-2 text-sm">
               <li>
-                <a href="#" className="hover:text-teal-400 transition-colors">
-                  Documentation
-                </a>
+                <Link
+                  to="/marketplace?category=houses-apartments"
+                  className="hover:text-white transition-colors"
+                >
+                  Houses & Apartments
+                </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-teal-400 transition-colors">
-                  Help Center
-                </a>
+                <Link
+                  to="/marketplace?category=land-plots"
+                  className="hover:text-white transition-colors"
+                >
+                  Land & Plots
+                </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-teal-400 transition-colors">
-                  Community
-                </a>
+                <Link
+                  to="/marketplace?category=commercial"
+                  className="hover:text-white transition-colors"
+                >
+                  Commercial Property
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/marketplace?category=short-let"
+                  className="hover:text-white transition-colors"
+                >
+                  Short Let
+                </Link>
               </li>
             </ul>
           </div>
 
+          {/* Company */}
           <div>
-            <h4 className="text-white font-semibold mb-4 text-base">Connect</h4>
-            <div className="flex space-x-4">
-              <a
-                href="#"
-                className="w-10 h-10 bg-zinc-800 rounded-lg flex items-center justify-center hover:bg-teal-700 transition-colors"
-              >
-                <Twitter size={20} />
-              </a>
-              <a
-                href="#"
-                className="w-10 h-10 bg-zinc-800 rounded-lg flex items-center justify-center hover:bg-teal-700 transition-colors"
-              >
-                <Github size={20} />
-              </a>
-              <a
-                href="#"
-                className="w-10 h-10 bg-zinc-800 rounded-lg flex items-center justify-center hover:bg-teal-700 transition-colors"
-              >
-                <Linkedin size={20} />
-              </a>
-            </div>
+            <h4 className="text-white font-semibold mb-4">Company</h4>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <Link to="#" className="hover:text-white transition-colors">
+                  About Us
+                </Link>
+              </li>
+              <li>
+                <Link to="#" className="hover:text-white transition-colors">
+                  Contact
+                </Link>
+              </li>
+              <li>
+                <Link to="#" className="hover:text-white transition-colors">
+                  Terms of Service
+                </Link>
+              </li>
+              <li>
+                <Link to="#" className="hover:text-white transition-colors">
+                  Privacy Policy
+                </Link>
+              </li>
+            </ul>
           </div>
         </div>
 
-        <div className="border-t border-zinc-800 mt-12 pt-8 text-center">
-          <p className="text-sm text-zinc-400">
-            © {new Date().getFullYear()} PropaChain. All rights reserved. Built
-            on Movement Blockchain.
-          </p>
+        <div className="border-t border-gray-800 pt-8 text-center text-sm text-gray-400">
+          <p>&copy; 2026 PropaChain. All rights reserved.</p>
         </div>
       </div>
     </footer>
   );
-};
+}

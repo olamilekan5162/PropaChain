@@ -22,7 +22,7 @@ export const Button = ({
     ghost:
       "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 border border-transparent",
     danger:
-      "bg-red-600 text-white hover:bg-red-700 active:bg-red-800 border border-red-600",
+      "bg-teal-700 text-white hover:bg-teal-800 active:bg-teal-900 border border-teal-700",
     outline:
       "bg-transparent text-teal-700 border border-teal-700 hover:bg-teal-50",
   };

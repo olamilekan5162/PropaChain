@@ -1,616 +1,756 @@
-import { useParams } from "react-router-dom";
+import { useState } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   MapPin,
+  Bed,
+  Bath,
+  Maximize,
   Share2,
   Heart,
-  FileText,
-  ShieldCheck,
-  Clock,
-  Loader2,
-  Home,
-  X,
+  Phone,
+  Mail,
+  MessageCircle,
+  ChevronLeft,
+  ChevronRight,
+  Check,
   Eye,
-  Lock,
+  Clock,
+  Shield,
+  FileText,
   Video,
+  Download,
+  ExternalLink,
+  Lock,
+  CheckCircle,
+  AlertCircle,
+  ArrowLeft,
+  Play,
+  Wallet,
+  DollarSign,
+  Calendar,
+  User,
+  Building,
 } from "lucide-react";
-import { Button } from "../components/common/Button";
-import { StatusBadge } from "../components/common/StatusBadge";
-import { CountdownTimer } from "../components/common/CountdownTimer";
-import { PurchaseModal } from "../components/features/PurchaseModal";
-import { EscrowActions } from "../components/features/EscrowActions";
-import { useState, useEffect } from "react";
-import { useFetchProperties } from "../hooks/useFetchProperties";
-import { useEscrows } from "../hooks/useEscrows";
-import { useMovementWallet } from "../hooks/useMovementWallet";
-import { addressesEqual } from "../utils/helper";
-
-const GATEWAY_URL = import.meta.env.VITE_PINATA_GATEWAY;
+import { mockProperties } from "../data/mockData";
+import PropertyCard from "../components/common/PropertyCard";
 
 export default function PropertyDetails() {
   const { id } = useParams();
-  const { fetchPropertyById } = useFetchProperties();
-  const { fetchEscrowById } = useEscrows();
-  const { walletAddress } = useMovementWallet();
-  const [property, setProperty] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [activeImage, setActiveImage] = useState(0);
-  const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
-  const [escrowId, setEscrowId] = useState(null);
-  const [escrowData, setEscrowData] = useState(null);
-  const [canViewDocuments, setCanViewDocuments] = useState(false);
-  const [showDocumentViewer, setShowDocumentViewer] = useState(false);
-  const [showVideoViewer, setShowVideoViewer] = useState(false);
+  const navigate = useNavigate();
+  const property = mockProperties.find((p) => p.id === id);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showContact, setShowContact] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [showVideoModal, setShowVideoModal] = useState(false);
 
-  useEffect(() => {
-    const loadProperty = async () => {
-      try {
-        setLoading(true);
-        const formattedProperty = await fetchPropertyById(id);
-
-        if (formattedProperty) {
-          // Add extra fields needed for details page that aren't in the standard format
-          formattedProperty.rentPrice = formattedProperty.monthlyRent || 0;
-          formattedProperty.rentalPeriod =
-            formattedProperty.rentalPeriodMonths || 0;
-          formattedProperty.features = formattedProperty.propertyType
-            ? [
-                formattedProperty.propertyType,
-                "Blockchain Verified",
-                "Smart Contract Protected",
-              ]
-            : ["Blockchain Verified", "Smart Contract Protected"];
-          formattedProperty.documents = formattedProperty.documentsCid
-            ? [
-                {
-                  name: "Property Documents",
-                  size: "View on IPFS",
-                  cid: formattedProperty.documentsCid,
-                },
-              ]
-            : [];
-          formattedProperty.propertyStatus = formattedProperty.status;
-
-          setProperty(formattedProperty);
-
-          if (formattedProperty.escrowId) {
-            setEscrowId(formattedProperty.escrowId);
-
-            // Fetch escrow data
-            try {
-              const escrow = await fetchEscrowById(formattedProperty.escrowId);
-              setEscrowData(escrow);
-            } catch (error) {
-              console.error("Error fetching escrow:", error);
-            }
-          }
-        } else {
-          setError("Property not found");
-        }
-      } catch (err) {
-        console.error("Error loading property:", err);
-        setError(err.message || "Failed to load property");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (id) {
-      loadProperty();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  // Separate effect to check document access when wallet connects
-  useEffect(() => {
-    if (property && walletAddress && property.owner) {
-      console.log("Document access check (wallet effect):", {
-        rawWallet: walletAddress,
-        rawOwner: property.owner,
-        match: addressesEqual(walletAddress, property.owner),
-      });
-
-      // Use addressesEqual directly - it handles normalization internally
-      if (addressesEqual(walletAddress, property.owner)) {
-        console.log("✅ Access granted - user is property owner");
-        setCanViewDocuments(true);
-      } else {
-        console.log("❌ Access denied - user is not property owner");
-        setCanViewDocuments(false);
-      }
-    } else {
-      console.log("Wallet effect - Missing data:", {
-        hasProperty: !!property,
-        hasWallet: !!walletAddress,
-        hasOwner: !!property?.owner,
-      });
-      setCanViewDocuments(false);
-    }
-  }, [property, walletAddress]);
-
-  const handleStatusChange = () => {
-    // window.location.reload();
+  // Mock blockchain data
+  const escrowData = {
+    isActive: true,
+    amount: property?.price || 0,
+    buyerDeposit: (property?.price || 0) * 0.1, // 10% deposit
+    status: "pending_inspection",
+    timeline: [
+      { step: "Deposit Made", completed: true, date: "Jan 10, 2026" },
+      { step: "Inspection Scheduled", completed: true, date: "Jan 12, 2026" },
+      { step: "Inspection Approved", completed: false, date: "-" },
+      { step: "Final Payment", completed: false, date: "-" },
+      { step: "Transfer Complete", completed: false, date: "-" },
+    ],
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="animate-spin text-teal-700" size={48} />
-          <p className="text-zinc-600 font-medium">
-            Loading property details...
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const documents = [
+    {
+      id: 1,
+      name: "Certificate of Occupancy (C of O)",
+      type: "PDF",
+      size: "2.4 MB",
+      verified: true,
+    },
+    { id: 2, name: "Survey Plan", type: "PDF", size: "1.8 MB", verified: true },
+    {
+      id: 3,
+      name: "Building Approval",
+      type: "PDF",
+      size: "1.2 MB",
+      verified: true,
+    },
+    {
+      id: 4,
+      name: "Land Registry",
+      type: "PDF",
+      size: "3.1 MB",
+      verified: true,
+    },
+    {
+      id: 5,
+      name: "Property Tax Receipt",
+      type: "PDF",
+      size: "890 KB",
+      verified: true,
+    },
+  ];
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-zinc-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-xl border border-zinc-200 p-8 text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <X className="w-8 h-8 text-red-600" />
-          </div>
-          <h2 className="text-xl font-semibold text-zinc-900 mb-2">
-            Error Loading Property
-          </h2>
-          <p className="text-zinc-600 mb-6">{error}</p>
-          <Button onClick={() => window.history.back()}>Go Back</Button>
-        </div>
-      </div>
-    );
-  }
+  const videos = [
+    {
+      id: 1,
+      title: "Property Tour",
+      thumbnail: property?.images[0],
+      duration: "5:23",
+    },
+    {
+      id: 2,
+      title: "Neighborhood Overview",
+      thumbnail: property?.images[1],
+      duration: "3:45",
+    },
+    {
+      id: 3,
+      title: "Interior Walkthrough",
+      thumbnail: property?.images[2],
+      duration: "7:12",
+    },
+  ];
 
   if (!property) {
     return (
-      <div className="min-h-screen bg-zinc-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-xl border border-zinc-200 p-8 text-center">
-          <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Home className="w-8 h-8 text-zinc-400" />
-          </div>
-          <h2 className="text-xl font-semibold text-zinc-900 mb-2">
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
             Property Not Found
           </h2>
-          <p className="text-zinc-600 mb-6">
-            The property you're looking for doesn't exist or has been removed.
-          </p>
-          <Button onClick={() => (window.location.href = "/marketplace")}>
-            Browse Properties
-          </Button>
+          <Link
+            to="/marketplace"
+            className="text-teal-700 hover:text-teal-800 font-medium"
+          >
+            Browse All Properties
+          </Link>
         </div>
       </div>
     );
   }
 
+  const formatPrice = (price) => {
+    if (price >= 1000000) return `₦${(price / 1000000).toFixed(1)}M`;
+    return `₦${price.toLocaleString()}`;
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const nextImage = () => {
+    setCurrentImageIndex((prev) =>
+      prev === property.images.length - 1 ? 0 : prev + 1
+    );
+  };
+
+  const prevImage = () => {
+    setCurrentImageIndex((prev) =>
+      prev === 0 ? property.images.length - 1 : prev - 1
+    );
+  };
+
+  const relatedProperties = mockProperties
+    .filter((p) => p.id !== property.id && p.category === property.category)
+    .slice(0, 3);
+
+  const tabs = [
+    { id: "overview", label: "Overview" },
+    { id: "escrow", label: "Escrow", badge: escrowData.isActive },
+    { id: "documents", label: "Documents", count: documents.length },
+    { id: "videos", label: "Videos", count: videos.length },
+  ];
+
   return (
-    <div className="min-h-screen bg-zinc-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Left Column - Property Info */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Property Header */}
-            <div className="bg-white rounded-xl border border-zinc-200 p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h1 className="text-3xl font-semibold text-zinc-900 mb-2">
-                    {property.title}
-                  </h1>
-                  <div className="flex items-center gap-2 text-zinc-600">
-                    <MapPin size={18} className="text-teal-700" />
-                    <span>{property.location}</span>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button className="p-2.5 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors">
-                    <Heart size={20} className="text-zinc-600" />
-                  </button>
-                  <button className="p-2.5 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors">
-                    <Share2 size={20} className="text-zinc-600" />
-                  </button>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <StatusBadge
-                  status={property.propertyStatus}
-                  listingType={property.listing_type}
-                />
-                <span className="text-sm text-zinc-500">
-                  Property ID: #{property.id.toString().padStart(4, "0")}
-                </span>
-              </div>
-            </div>
-
-            {/* Image Gallery */}
-            <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-              <div className="aspect-video relative bg-zinc-100">
-                {property.images && property.images.length > 0 ? (
-                  <img
-                    src={property.images[activeImage]}
-                    alt={property.title}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.src =
-                        "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800";
-                    }}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-zinc-400">
-                    <Home size={64} />
-                  </div>
-                )}
-              </div>
-
-              {/* Thumbnail Navigation */}
-              {property.images && property.images.length > 1 && (
-                <div className="p-4 flex gap-3 overflow-x-auto">
-                  {property.images.map((img, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setActiveImage(i)}
-                      className={`shrink-0 w-24 h-24 rounded-lg overflow-hidden border-2 transition-all ${
-                        activeImage === i
-                          ? "border-teal-700 ring-2 ring-teal-700/20"
-                          : "border-zinc-200 hover:border-zinc-300"
-                      }`}
-                    >
-                      <img
-                        src={img}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.src =
-                            "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=800";
-                        }}
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Property Stats */}
-            <div className="bg-white rounded-xl border border-zinc-200 p-6">
-              <h3 className="text-lg font-semibold text-zinc-900 mb-6">
-                Property Details
-              </h3>
-
-              <div className="border-t border-zinc-200 pt-6">
-                <h4 className="font-semibold text-zinc-900 mb-3">
-                  About This Property
-                </h4>
-                <p className="text-zinc-600 leading-relaxed whitespace-pre-wrap">
-                  {property.description}
-                </p>
-              </div>
-
-              <div className="border-t border-zinc-200 pt-6 mt-6">
-                <h4 className="font-semibold text-zinc-900 mb-3">
-                  Features & Amenities
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {property.features.map((feature, i) => (
-                    <span
-                      key={i}
-                      className="px-3 py-1.5 bg-zinc-100 text-zinc-700 rounded-lg text-sm font-medium"
-                    >
-                      {feature}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Inspection Video */}
-            {property.videoCid && (
-              <div className="bg-white rounded-xl border border-zinc-200 p-6">
-                <h3 className="text-lg font-semibold text-zinc-900 mb-4">
-                  Property Inspection Video
-                </h3>
-                <div className="flex items-center justify-between p-4 rounded-lg border border-zinc-200 bg-zinc-50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-purple-50 text-purple-700 rounded-lg">
-                      <Video size={20} />
-                    </div>
-                    <div>
-                      <p className="font-medium text-zinc-900">
-                        Property Walkthrough
-                      </p>
-                      <p className="text-xs text-zinc-500">
-                        Available for all viewers
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowVideoViewer(true)}
-                    className="flex items-center gap-2"
-                  >
-                    <Eye size={16} />
-                    Watch Video
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Documents - Only for sale properties */}
-            {property.listing_type === 1 && property.documents.length > 0 && (
-              <div className="bg-white rounded-xl border border-zinc-200 p-6">
-                <h3 className="text-lg font-semibold text-zinc-900 mb-4">
-                  Property Documents
-                </h3>
-                {canViewDocuments ? (
-                  <div className="space-y-3">
-                    {property.documents.map((doc, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between p-4 rounded-lg border border-zinc-200 bg-zinc-50"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="p-2.5 bg-teal-50 text-teal-700 rounded-lg">
-                            <FileText size={20} />
-                          </div>
-                          <div>
-                            <p className="font-medium text-zinc-900">
-                              {doc.name}
-                            </p>
-                            <p className="text-xs text-teal-600">
-                              ✓ Access Granted
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowDocumentViewer(true)}
-                          className="flex items-center gap-2"
-                        >
-                          <Eye size={16} />
-                          View Document
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 bg-zinc-50 rounded-lg border border-zinc-200">
-                    <div className="w-12 h-12 bg-zinc-200 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Lock size={20} className="text-zinc-500" />
-                    </div>
-                    <p className="text-sm font-medium text-zinc-900 mb-1">
-                      Documents Locked
-                    </p>
-                    <p className="text-xs text-zinc-600">
-                      Property documents are only accessible to the property
-                      owner
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Right Column - Action Panel */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-xl border border-zinc-200 p-6 sticky top-24">
-              <div className="mb-6">
-                <p className="text-sm text-zinc-500 mb-2">
-                  {property.listing_type === 2 ? "Monthly Rent" : "Sale Price"}
-                </p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-semibold text-teal-700">
-                    {property.listing_type === 2
-                      ? (property.monthlyRent || 0).toLocaleString()
-                      : property.price.toLocaleString()}
-                  </span>
-                  <span className="text-lg text-zinc-500">MOVE</span>
-                </div>
-              </div>
-
-              <div className="space-y-3 mb-6">
-                {property.propertyStatus === 1 ? (
-                  property.listing_type === 1 ? (
-                    <Button
-                      className="w-full h-12 text-base"
-                      onClick={() => setIsPurchaseModalOpen(true)}
-                    >
-                      Purchase Property
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="secondary"
-                      className="w-full h-12 text-base"
-                      onClick={() => setIsPurchaseModalOpen(true)}
-                    >
-                      Rent Property
-                    </Button>
-                  )
-                ) : (
-                  <div className="p-4 bg-zinc-100 rounded-lg text-center">
-                    <p className="text-sm text-zinc-700 font-medium">
-                      {property.propertyStatus === 2 && "In Escrow Process"}
-                      {property.propertyStatus === 3 && "Sold"}
-                      {property.propertyStatus === 4 && "Currently Rented"}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-4 bg-teal-50 rounded-lg border border-teal-100">
-                <div className="flex items-start gap-3">
-                  <ShieldCheck
-                    className="text-teal-700 shrink-0 mt-0.5"
-                    size={20}
-                  />
-                  <div>
-                    <p className="text-sm font-semibold text-zinc-900 mb-1">
-                      Escrow Protected
-                    </p>
-                    <p className="text-xs text-zinc-600">
-                      Your funds are secured in a smart contract until ownership
-                      transfer is completed.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {property.listing_type === 2 &&
-                property.propertyStatus === 4 &&
-                property.rentalEndDate &&
-                escrowData &&
-                walletAddress &&
-                addressesEqual(walletAddress, escrowData.buyer_renter) && (
-                  <div className="mt-6 pt-6 border-t border-zinc-200">
-                    <div className="flex items-center gap-2 mb-3 text-zinc-900 font-medium text-sm">
-                      <Clock size={16} className="text-teal-700" /> Rental
-                      Period Ends
-                    </div>
-                    <CountdownTimer
-                      targetDate={
-                        new Date(parseInt(property.rentalEndDate) * 1000)
-                      }
-                      className="justify-between"
-                    />
-                  </div>
-                )}
-            </div>
-
-            {/* Escrow Actions */}
-            {escrowId && property.propertyStatus === 2 && (
-              <EscrowActions
-                property={property}
-                escrowId={escrowId}
-                onStatusChange={handleStatusChange}
-              />
-            )}
-          </div>
+    <div className="min-h-screen bg-gray-50 pb-16 md:pb-8">
+      {/* Back Button */}
+      <div className="bg-white border-b border-gray-200 px-3 md:px-4 py-2 md:py-3">
+        <div className="max-w-7xl mx-auto">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1.5 md:gap-2 text-sm md:text-base text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span className="font-medium">Back</span>
+          </button>
         </div>
       </div>
 
-      <PurchaseModal
-        isOpen={isPurchaseModalOpen}
-        onClose={() => setIsPurchaseModalOpen(false)}
-        property={property}
-      />
+      {/* Image Gallery */}
+      <div className="relative bg-black group">
+        {/* Check if current item is a video */}
+        {currentImageIndex < property.images.length ? (
+          <img
+            src={property.images[currentImageIndex]}
+            alt={property.title}
+            className="w-full h-56 md:h-[500px] object-cover"
+          />
+        ) : (
+          <div className="relative w-full h-56 md:h-[500px]">
+            <video
+              src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+              controls
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
 
-      {/* Document Viewer Modal */}
-      {showDocumentViewer && property.documents.length > 0 && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 bg-zinc-50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center">
-                  <FileText size={20} className="text-teal-700" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-zinc-900">
-                    {property.documents[0].name}
-                  </h3>
-                  <p className="text-xs text-zinc-500">Stored on IPFS</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowDocumentViewer(false)}
-                className="w-9 h-9 rounded-lg hover:bg-zinc-100 flex items-center justify-center transition-colors"
-              >
-                <X size={20} className="text-zinc-600" />
-              </button>
-            </div>
+        {/* Image Counter */}
+        <div className="absolute bottom-3 md:bottom-4 left-3 md:left-4 bg-black bg-opacity-70 text-white px-2 md:px-3 py-1 md:py-1.5 rounded-lg text-xs md:text-sm">
+          {currentImageIndex + 1} /{" "}
+          {property.images.length + (videos.length || 0)}
+        </div>
 
-            {/* Document Viewer */}
-            <div className="flex-1 overflow-hidden bg-zinc-100">
-              <iframe
-                src={`https://${GATEWAY_URL}/ipfs/${property.documents[0].cid}`}
-                className="w-full h-full border-0"
-                title="Property Documents"
+        {/* Navigation Arrows */}
+        {property.images.length + (videos.length || 0) > 1 && (
+          <>
+            <button
+              onClick={prevImage}
+              className="absolute left-1 md:left-2 top-1/2 -translate-y-1/2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full p-1.5 md:p-2 shadow-lg transition-all"
+            >
+              <ChevronLeft className="w-5 md:w-6 h-5 md:h-6" />
+            </button>
+            <button
+              onClick={nextImage}
+              className="absolute right-1 md:right-2 top-1/2 -translate-y-1/2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full p-1.5 md:p-2 shadow-lg transition-all"
+            >
+              <ChevronRight className="w-5 md:w-6 h-5 md:h-6" />
+            </button>
+          </>
+        )}
+
+        {/* Action Buttons - Only visible on hover */}
+        <div className="absolute top-3 md:top-4 right-3 md:right-4 flex gap-1.5 md:gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <button className="bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full p-2 md:p-2.5 shadow-lg transition-all">
+            <Share2 className="w-4 md:w-5 h-4 md:h-5" />
+          </button>
+          <button className="bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full p-2 md:p-2.5 shadow-lg transition-all">
+            <Heart className="w-4 md:w-5 h-4 md:h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Thumbnail Strip */}
+      <div className="bg-white border-b border-gray-200 px-3 md:px-4 py-2 md:py-3 overflow-x-auto">
+        <div className="max-w-7xl mx-auto flex gap-1.5 md:gap-2">
+          {property.images.map((img, idx) => (
+            <button
+              key={idx}
+              onClick={() => setCurrentImageIndex(idx)}
+              className={`w-16 md:w-20 h-16 md:h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${
+                idx === currentImageIndex
+                  ? "border-teal-700 opacity-100"
+                  : "border-transparent opacity-60"
+              }`}
+            >
+              <img
+                src={img}
+                alt={`View ${idx + 1}`}
+                className="w-full h-full object-cover"
               />
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-zinc-200 bg-zinc-50 flex items-center justify-between">
-              <p className="text-xs text-zinc-600">
-                Document CID:{" "}
-                <span className="font-mono text-zinc-900">
-                  {typeof property.documents[0].cid === "object"
-                    ? property.documents[0].cid?.vec?.[0] || "N/A"
-                    : property.documents[0].cid || "N/A"}
-                </span>
-              </p>
-              <Button onClick={() => setShowDocumentViewer(false)}>
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Video Viewer Modal */}
-      {showVideoViewer && property.videoCid && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 bg-zinc-50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
-                  <Video size={20} className="text-purple-700" />
+            </button>
+          ))}
+          {videos &&
+            videos.map((video, idx) => (
+              <button
+                key={`video-${idx}`}
+                onClick={() =>
+                  setCurrentImageIndex(property.images.length + idx)
+                }
+                className={`relative w-16 md:w-20 h-16 md:h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${
+                  property.images.length + idx === currentImageIndex
+                    ? "border-teal-700 opacity-100"
+                    : "border-transparent opacity-60"
+                }`}
+              >
+                <img
+                  src={property.images[0]}
+                  alt={`Video ${idx + 1}`}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+                  <Play className="w-6 h-6 text-white" />
                 </div>
-                <div>
-                  <h3 className="font-semibold text-zinc-900">
-                    Property Inspection Video
-                  </h3>
-                  <p className="text-xs text-zinc-500">Stored on IPFS</p>
+              </button>
+            ))}
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-3 md:px-4 py-4 md:py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-4 md:space-y-6">
+            {/* Title & Price */}
+            <div className="bg-white rounded-lg border border-gray-200 p-4 md:p-6">
+              <div className="flex items-start justify-between gap-3 md:gap-4 mb-3 md:mb-4">
+                <div className="min-w-0">
+                  <h1 className="text-xl md:text-3xl font-bold text-gray-900 mb-2">
+                    {property.title}
+                  </h1>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs md:text-sm text-gray-600">
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-3.5 md:w-4 h-3.5 md:h-4 flex-shrink-0" />
+                      <span className="truncate">{property.location}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Eye className="w-3.5 md:w-4 h-3.5 md:h-4 flex-shrink-0" />
+                      <span>{property.views} views</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3.5 md:w-4 h-3.5 md:h-4 flex-shrink-0" />
+                      <span className="hidden sm:inline">
+                        Listed {formatDate(property.listedDate)}
+                      </span>
+                      <span className="sm:hidden">
+                        {formatDate(property.listedDate)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <span className="px-2 md:px-3 py-1 md:py-1.5 bg-teal-100 text-teal-700 rounded-lg text-xs md:text-sm font-semibold uppercase flex-shrink-0">
+                  {property.type}
+                </span>
+              </div>
+
+              <div className="border-t border-gray-200 pt-3 md:pt-4">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl md:text-4xl font-bold text-teal-700">
+                    {formatPrice(property.price)}
+                  </span>
+                  {property.type === "short-let" && (
+                    <span className="text-lg text-gray-600">/night</span>
+                  )}
+                  {property.type === "rent" && (
+                    <span className="text-lg text-gray-600">/year</span>
+                  )}
+                </div>
+                {escrowData.isActive && (
+                  <div className="mt-2 flex items-center gap-2 text-sm">
+                    <Shield className="w-4 h-4 text-green-600" />
+                    <span className="text-green-600 font-medium">
+                      Protected by Blockchain Escrow
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Property Stats */}
+            <div className="bg-white rounded-lg border border-gray-200 p-4 md:p-6">
+              <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-4 md:mb-6">
+                Property Details
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                {property.bedrooms && (
+                  <div className="flex flex-col gap-2">
+                    <Bed className="w-6 h-6 text-teal-700" />
+                    <div>
+                      <p className="text-2xl md:text-3xl font-bold text-gray-900">
+                        {property.bedrooms}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">Bedrooms</p>
+                    </div>
+                  </div>
+                )}
+                {property.bathrooms && (
+                  <div className="flex flex-col gap-2">
+                    <Bath className="w-6 h-6 text-blue-600" />
+                    <div>
+                      <p className="text-2xl md:text-3xl font-bold text-gray-900">
+                        {property.bathrooms}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">Bathrooms</p>
+                    </div>
+                  </div>
+                )}
+                {property.area && (
+                  <div className="flex flex-col gap-2">
+                    <Maximize className="w-6 h-6 text-purple-600" />
+                    <div>
+                      <p className="text-2xl md:text-3xl font-bold text-gray-900">
+                        {property.area}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">sqm</p>
+                    </div>
+                  </div>
+                )}
+                {property.type && (
+                  <div className="flex flex-col gap-2">
+                    <Building className="w-6 h-6 text-gray-700" />
+                    <div>
+                      <p className="text-xl md:text-2xl font-bold text-gray-900 capitalize">
+                        {property.type}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">Type</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <div className="border-b border-gray-200 overflow-x-auto">
+                <div className="flex">
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`px-4 md:px-6 py-2.5 md:py-3 text-sm md:text-base font-medium whitespace-nowrap transition-colors relative ${
+                        activeTab === tab.id
+                          ? "text-teal-700 border-b-2 border-teal-700"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5 md:gap-2">
+                        {tab.label}
+                        {tab.badge && (
+                          <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        )}
+                        {tab.count && (
+                          <span className="px-1.5 py-0.5 bg-gray-200 text-gray-700 rounded text-xs">
+                            {tab.count}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  ))}
                 </div>
               </div>
+
+              <div className="p-4 md:p-6">
+                {/* Overview Tab */}
+                {activeTab === "overview" && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-3">
+                        Description
+                      </h3>
+                      <p className="text-gray-600 leading-relaxed">
+                        {property.description}
+                      </p>
+                    </div>
+
+                    {property.features && property.features.length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-3">
+                          Features & Amenities
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {property.features.map((feature, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+                              <span className="text-gray-700">{feature}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Escrow Tab */}
+                {activeTab === "escrow" && (
+                  <div className="space-y-6">
+                    {escrowData.isActive ? (
+                      <>
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                          <div className="flex items-start gap-3">
+                            <Shield className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <h4 className="font-semibold text-green-900 mb-1">
+                                Escrow Active
+                              </h4>
+                              <p className="text-sm text-green-700">
+                                This transaction is protected by
+                                blockchain-based smart contract escrow. Funds
+                                are secure until all conditions are met.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                          <div className="border border-gray-200 rounded-lg p-3 md:p-4">
+                            <p className="text-xs md:text-sm text-gray-600 mb-1">
+                              Total Amount
+                            </p>
+                            <p className="text-xl md:text-2xl font-bold text-gray-900">
+                              {formatPrice(escrowData.amount)}
+                            </p>
+                          </div>
+                          <div className="border border-gray-200 rounded-lg p-3 md:p-4">
+                            <p className="text-xs md:text-sm text-gray-600 mb-1">
+                              Deposited
+                            </p>
+                            <p className="text-xl md:text-2xl font-bold text-teal-700">
+                              {formatPrice(escrowData.buyerDeposit)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="font-semibold text-gray-900 mb-4">
+                            Transaction Timeline
+                          </h4>
+                          <div className="space-y-4">
+                            {escrowData.timeline.map((item, idx) => (
+                              <div key={idx} className="flex gap-4">
+                                <div className="flex flex-col items-center">
+                                  <div
+                                    className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                      item.completed
+                                        ? "bg-green-600"
+                                        : "bg-gray-300"
+                                    }`}
+                                  >
+                                    {item.completed ? (
+                                      <Check className="w-5 h-5 text-white" />
+                                    ) : (
+                                      <div className="w-3 h-3 bg-white rounded-full"></div>
+                                    )}
+                                  </div>
+                                  {idx < escrowData.timeline.length - 1 && (
+                                    <div
+                                      className={`w-0.5 h-12 ${
+                                        item.completed
+                                          ? "bg-green-600"
+                                          : "bg-gray-300"
+                                      }`}
+                                    ></div>
+                                  )}
+                                </div>
+                                <div className="flex-1 pb-8">
+                                  <p
+                                    className={`font-medium ${
+                                      item.completed
+                                        ? "text-gray-900"
+                                        : "text-gray-500"
+                                    }`}
+                                  >
+                                    {item.step}
+                                  </p>
+                                  <p className="text-sm text-gray-500">
+                                    {item.date}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                          <button className="flex-1 px-4 py-3 bg-teal-700 text-white rounded-lg font-semibold hover:bg-teal-800 transition-colors">
+                            Continue Transaction
+                          </button>
+                          <button className="px-4 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors">
+                            View Contract
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-8">
+                        <Lock className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                        <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                          No Active Escrow
+                        </h4>
+                        <p className="text-gray-600 mb-6">
+                          Start a secure transaction with blockchain-based
+                          escrow protection
+                        </p>
+                        <button className="px-6 py-3 bg-teal-700 text-white rounded-lg font-semibold hover:bg-teal-800 transition-colors">
+                          Initiate Escrow
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Documents Tab */}
+                {activeTab === "documents" && (
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                      <div className="flex items-start gap-3">
+                        <CheckCircle className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <h4 className="font-semibold text-blue-900 mb-1">
+                            All Documents Verified
+                          </h4>
+                          <p className="text-sm text-blue-700">
+                            Property documents have been verified and stored on
+                            the blockchain for transparency
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {documents.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center gap-3 md:gap-4 p-3 md:p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="w-10 md:w-12 h-10 md:h-12 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <FileText className="w-5 md:w-6 h-5 md:h-6 text-red-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-medium text-sm md:text-base text-gray-900 truncate">
+                              {doc.name}
+                            </p>
+                            {doc.verified && (
+                              <CheckCircle className="w-3.5 md:w-4 h-3.5 md:h-4 text-green-600 flex-shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-xs md:text-sm text-gray-500">
+                            {doc.type} • {doc.size}
+                          </p>
+                        </div>
+                        <div className="flex gap-1 md:gap-2 flex-shrink-0">
+                          <button className="p-1.5 md:p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                            <Eye className="w-4 md:w-5 h-4 md:h-5 text-gray-600" />
+                          </button>
+                          <button className="p-1.5 md:p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                            <Download className="w-4 md:w-5 h-4 md:h-5 text-gray-600" />
+                          </button>
+                          <button className="p-1.5 md:p-2 hover:bg-gray-100 rounded-lg transition-colors hidden sm:block">
+                            <ExternalLink className="w-4 md:w-5 h-4 md:h-5 text-gray-600" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Videos Tab */}
+                {activeTab === "videos" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {videos.map((video) => (
+                      <div
+                        key={video.id}
+                        className="relative group cursor-pointer rounded-lg overflow-hidden"
+                        onClick={() => setShowVideoModal(true)}
+                      >
+                        <img
+                          src={video.thumbnail}
+                          alt={video.title}
+                          className="w-full h-48 object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-40 group-hover:bg-opacity-50 transition-all flex items-center justify-center">
+                          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
+                            <Play className="w-8 h-8 text-teal-700 ml-1" />
+                          </div>
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black to-transparent">
+                          <p className="text-white font-medium mb-1">
+                            {video.title}
+                          </p>
+                          <p className="text-white text-sm">{video.duration}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-4 md:space-y-6">
+            {/* Seller Card */}
+            <div className="bg-white rounded-lg border border-gray-200 p-4 md:p-6 lg:sticky lg:top-4">
+              <h3 className="text-base md:text-lg font-bold text-gray-900 mb-3 md:mb-4">
+                Listed By
+              </h3>
+              <div className="flex items-center gap-3 mb-4 md:mb-6">
+                <div className="w-10 md:w-12 h-10 md:h-12 bg-teal-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-teal-700 font-bold text-base md:text-lg">
+                    {property.seller?.name?.charAt(0) || "S"}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900">
+                    {property.seller?.name || "Property Owner"}
+                  </p>
+                  <div className="flex items-center gap-1 text-sm text-gray-600">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <span>Verified Seller</span>
+                  </div>
+                </div>
+              </div>
+
+              {!showContact ? (
+                <button
+                  onClick={() => setShowContact(true)}
+                  className="w-full px-4 py-3 bg-teal-700 text-white rounded-lg font-semibold hover:bg-teal-800 transition-colors flex items-center justify-center gap-2 mb-3"
+                >
+                  <Phone className="w-5 h-5" />
+                  <span>Show Contact</span>
+                </button>
+              ) : (
+                <div className="space-y-3 mb-3">
+                  <a
+                    href="tel:+2348012345678"
+                    className="w-full px-4 py-3 bg-teal-700 text-white rounded-lg font-semibold hover:bg-teal-800 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Phone className="w-5 h-5" />
+                    <span>Call Seller</span>
+                  </a>
+                  <a
+                    href="mailto:seller@example.com"
+                    className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Mail className="w-5 h-5" />
+                    <span>Email</span>
+                  </a>
+                </div>
+              )}
+
               <button
-                onClick={() => setShowVideoViewer(false)}
-                className="w-9 h-9 rounded-lg hover:bg-zinc-100 flex items-center justify-center transition-colors"
+                onClick={() => navigate("/app/transactions")}
+                className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
               >
-                <X size={20} className="text-zinc-600" />
+                <MessageCircle className="w-5 h-5" />
+                <span>Send Message</span>
               </button>
-            </div>
 
-            {/* Video Player */}
-            <div className="flex-1 overflow-hidden bg-black flex items-center justify-center">
-              <video
-                src={`https://${GATEWAY_URL}/ipfs/${property.videoCid}`}
-                controls
-                className="max-w-full max-h-full"
-                playsInline
-                preload="metadata"
-                onError={(e) => {
-                  console.error("Video failed to load:", e);
-                  console.log(
-                    "Video URL:",
-                    `${GATEWAY_URL}${property.videoCid}`
-                  );
-                }}
-              >
-                <source
-                  src={`${GATEWAY_URL}${property.videoCid}`}
-                  type="video/mp4"
-                />
-                <source
-                  src={`${GATEWAY_URL}${property.videoCid}`}
-                  type="video/webm"
-                />
-                Your browser does not support the video tag.
-              </video>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-zinc-200 bg-zinc-50 flex items-center justify-between">
-              <p className="text-xs text-zinc-600">
-                Video CID:{" "}
-                <span className="font-mono text-zinc-900">
-                  {property.videoCid}
-                </span>
-              </p>
-              <Button onClick={() => setShowVideoViewer(false)}>Close</Button>
+              {!escrowData.isActive && (
+                <>
+                  <div className="my-4 border-t border-gray-200"></div>
+                  <button
+                    onClick={() => navigate("/app/wallet")}
+                    className="w-full px-4 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Wallet className="w-5 h-5" />
+                    <span>Buy with Escrow</span>
+                  </button>
+                  <p className="text-xs text-gray-500 text-center mt-2">
+                    Protected by blockchain smart contract
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
-      )}
+
+        {/* Related Properties */}
+        {relatedProperties.length > 0 && (
+          <div className="mt-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+              Similar Properties
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {relatedProperties.map((property) => (
+                <PropertyCard key={property.id} property={property} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

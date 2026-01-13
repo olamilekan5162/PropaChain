@@ -1,236 +1,438 @@
-import { Search, SlidersHorizontal, Map, Loader } from "lucide-react";
-import { Button } from "../components/common/Button";
-import { Input } from "../components/common/Input";
-import { PropertyCard } from "../components/common/PropertyCard";
 import { useState, useEffect } from "react";
-import { useFetchProperties } from "../hooks/useFetchProperties";
-import toast from "react-hot-toast";
-
-const GATEWAY_URL = import.meta.env.VITE_PINATA_GATEWAY;
+import { useSearchParams } from "react-router-dom";
+import { Filter, X, ChevronDown, SlidersHorizontal } from "lucide-react";
+import {
+  mockProperties,
+  categories,
+  locations,
+  priceRanges,
+} from "../data/mockData";
+import PropertyCard from "../components/common/PropertyCard";
 
 export default function Marketplace() {
-  const { fetchAllProperties } = useFetchProperties();
-  const [properties, setProperties] = useState([]);
-  const [displayedProperties, setDisplayedProperties] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filterType, setFilterType] = useState("all"); // all, buy (sale), rent
-  const [searchLocation, setSearchLocation] = useState("");
-  const [minPrice, setMinPrice] = useState("");
-  const [maxPrice, setMaxPrice] = useState("");
+  const [searchParams] = useSearchParams();
+  const [properties, setProperties] = useState(mockProperties);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    category: searchParams.get("category") || "",
+    location: "",
+    priceRange: "",
+    type: "",
+    bedrooms: "",
+  });
 
-  // Fetch properties on component mount
   useEffect(() => {
-    loadProperties();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Apply filters
+    let filtered = [...mockProperties];
 
-  // Apply filters whenever filter criteria changes
-  useEffect(() => {
-    applyFilters();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterType, searchLocation, minPrice, maxPrice, properties]);
-
-  const loadProperties = async () => {
-    try {
-      setLoading(true);
-      const props = await fetchAllProperties();
-
-      // Filter to show only available properties (status 1)
-      const availableProps = props.filter((p) => p.status === 1);
-
-      setProperties(availableProps);
-    } catch (error) {
-      console.error("Failed to fetch properties:", error);
-      toast.error("Failed to load properties");
-      setProperties([]);
-      setDisplayedProperties([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const applyFilters = () => {
-    let filtered = [...properties];
-
-    // Filter by listing type (sale/rent)
-    // listing_type: 1 = Sale, 2 = Rent
-    if (filterType === "buy") {
-      filtered = filtered.filter((p) => p.listing_type === 1);
-    } else if (filterType === "rent") {
-      filtered = filtered.filter((p) => p.listing_type === 2);
+    if (filters.category) {
+      const category = categories.find((c) => c.slug === filters.category);
+      if (category) {
+        filtered = filtered.filter((p) => p.category === category.name);
+      }
     }
 
-    // Filter by location
-    if (searchLocation.trim()) {
-      const searchTerm = searchLocation.toLowerCase();
+    if (filters.location) {
       filtered = filtered.filter((p) =>
-        p.location?.toLowerCase().includes(searchTerm)
+        p.location.toLowerCase().includes(filters.location.toLowerCase())
       );
     }
 
-    // Filter by price range
-    if (minPrice) {
-      filtered = filtered.filter((p) => p.price >= Number(minPrice));
-    }
-    if (maxPrice) {
-      filtered = filtered.filter((p) => p.price <= Number(maxPrice));
+    if (filters.type) {
+      filtered = filtered.filter((p) => p.type === filters.type);
     }
 
-    setDisplayedProperties(filtered);
+    if (filters.bedrooms) {
+      filtered = filtered.filter(
+        (p) => p.bedrooms && p.bedrooms >= parseInt(filters.bedrooms)
+      );
+    }
+
+    if (filters.priceRange) {
+      const range = priceRanges.find((r) => r.label === filters.priceRange);
+      if (range) {
+        filtered = filtered.filter(
+          (p) => p.price >= range.min && p.price <= range.max
+        );
+      }
+    }
+
+    setProperties(filtered);
+  }, [filters]);
+
+  const handleFilterChange = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
+  const clearFilters = () => {
+    setFilters({
+      category: "",
+      location: "",
+      priceRange: "",
+      type: "",
+      bedrooms: "",
+    });
+  };
+
+  const activeFiltersCount = Object.values(filters).filter(Boolean).length;
+
   return (
-    <div className="min-h-screen bg-zinc-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-semibold text-zinc-900">
-              Marketplace
+    <div className="min-h-screen bg-gray-50 pb-14 md:pb-0">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-3 md:px-4 py-3 md:py-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg md:text-2xl font-bold text-gray-900">
+              Browse Properties
             </h1>
-            <p className="text-zinc-600">
-              Discover and trade real estate on Movement blockchain
-            </p>
-          </div>
-          <div className="inline-flex bg-white border border-zinc-200 rounded-lg p-1">
             <button
-              onClick={() => setFilterType("all")}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                filterType === "all"
-                  ? "bg-teal-700 text-white"
-                  : "text-zinc-600 hover:text-zinc-900"
-              }`}
+              onClick={() => setShowFilters(!showFilters)}
+              className="md:hidden flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 text-sm bg-teal-700 text-white rounded-lg font-medium hover:bg-teal-800 transition-colors flex-shrink-0"
             >
-              All
-            </button>
-            <button
-              onClick={() => setFilterType("buy")}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                filterType === "buy"
-                  ? "bg-teal-700 text-white"
-                  : "text-zinc-600 hover:text-zinc-900"
-              }`}
-            >
-              For Sale
-            </button>
-            <button
-              onClick={() => setFilterType("rent")}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                filterType === "rent"
-                  ? "bg-teal-700 text-white"
-                  : "text-zinc-600 hover:text-zinc-900"
-              }`}
-            >
-              For Rent
+              <SlidersHorizontal className="w-4 h-4 flex-shrink-0" />
+              <span className="whitespace-nowrap">Filters</span>
+              {activeFiltersCount > 0 && (
+                <span className="bg-white text-teal-700 rounded-full w-4 h-4 md:w-5 md:h-5 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                  {activeFiltersCount}
+                </span>
+              )}
             </button>
           </div>
-        </div>
 
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Filters Sidebar */}
-          <div className="w-full lg:w-72 space-y-6 bg-white p-6 rounded-lg border border-zinc-200 h-fit">
-            <div className="flex items-center gap-2 text-zinc-900 font-semibold">
-              <SlidersHorizontal size={20} />
-              <span>Filters</span>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-zinc-700 mb-2 block">
-                  Search Location
-                </label>
-                <div className="relative">
-                  <Search
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
-                    size={18}
-                  />
-                  <input
-                    type="text"
-                    placeholder="City, Address..."
-                    value={searchLocation}
-                    onChange={(e) => setSearchLocation(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-zinc-700 mb-2 block">
-                  Price Range (MOVE)
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="number"
-                    placeholder="Min"
-                    value={minPrice}
-                    onChange={(e) => setMinPrice(e.target.value)}
-                    className="px-3 py-2.5 rounded-lg border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Max"
-                    value={maxPrice}
-                    onChange={(e) => setMaxPrice(e.target.value)}
-                    className="px-3 py-2.5 rounded-lg border border-zinc-300 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
-                  />
-                </div>
-              </div>
-
-              <Button
-                className="w-full"
-                onClick={loadProperties}
-                disabled={loading}
-                size="sm"
+          {/* Active Filters */}
+          {activeFiltersCount > 0 && (
+            <div className="flex flex-wrap gap-2 mt-4">
+              {Object.entries(filters).map(
+                ([key, value]) =>
+                  value && (
+                    <span
+                      key={key}
+                      className="inline-flex items-center gap-1 px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm flex-shrink-0"
+                    >
+                      {value}
+                      <button
+                        onClick={() => handleFilterChange(key, "")}
+                        className="hover:text-teal-900 flex-shrink-0"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )
+              )}
+              <button
+                onClick={clearFilters}
+                className="text-teal-700 text-sm font-medium hover:text-teal-800 flex-shrink-0 whitespace-nowrap"
               >
-                {loading ? "Refreshing..." : "Refresh Properties"}
-              </Button>
+                Clear All
+              </button>
             </div>
-          </div>
-
-          {/* Property Grid */}
-          <div className="flex-1">
-            {loading ? (
-              <div className="flex justify-center items-center py-20">
-                <Loader className="animate-spin text-teal-700" size={32} />
-              </div>
-            ) : displayedProperties.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-lg border border-zinc-200">
-                <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Search size={32} className="text-zinc-400" />
-                </div>
-                <h3 className="text-lg font-medium text-zinc-900 mb-2">
-                  No properties found
-                </h3>
-                <p className="text-zinc-600 text-sm">
-                  Try adjusting your filters or check back later
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {displayedProperties.map((p) => (
-                    <PropertyCard key={p.id} property={p} />
-                  ))}
-                </div>
-
-                <div className="mt-8 text-center">
-                  <p className="text-sm text-zinc-600">
-                    Showing{" "}
-                    <span className="font-medium text-zinc-900">
-                      {displayedProperties.length}
-                    </span>{" "}
-                    of{" "}
-                    <span className="font-medium text-zinc-900">
-                      {properties.length}
-                    </span>{" "}
-                    properties
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
+          )}
         </div>
       </div>
+
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="flex gap-6">
+          {/* Filters Sidebar - Desktop */}
+          <aside className="hidden md:block w-64 flex-shrink-0">
+            <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-gray-900">Filters</h3>
+                {activeFiltersCount > 0 && (
+                  <button
+                    onClick={clearFilters}
+                    className="text-teal-700 text-sm font-medium hover:text-teal-800 whitespace-nowrap"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                {/* Category Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Category
+                  </label>
+                  <select
+                    value={filters.category}
+                    onChange={(e) =>
+                      handleFilterChange("category", e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+                  >
+                    <option value="">All Categories</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.slug}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Location Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Location
+                  </label>
+                  <select
+                    value={filters.location}
+                    onChange={(e) =>
+                      handleFilterChange("location", e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+                  >
+                    <option value="">All Locations</option>
+                    {locations.map((loc) => (
+                      <option key={loc} value={loc}>
+                        {loc}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Type Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Type
+                  </label>
+                  <select
+                    value={filters.type}
+                    onChange={(e) => handleFilterChange("type", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+                  >
+                    <option value="">All Types</option>
+                    <option value="sale">For Sale</option>
+                    <option value="rent">For Rent</option>
+                    <option value="short-let">Short Let</option>
+                  </select>
+                </div>
+
+                {/* Price Range */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Price Range
+                  </label>
+                  <select
+                    value={filters.priceRange}
+                    onChange={(e) =>
+                      handleFilterChange("priceRange", e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+                  >
+                    <option value="">All Prices</option>
+                    {priceRanges.map((range) => (
+                      <option key={range.label} value={range.label}>
+                        {range.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Bedrooms */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Minimum Bedrooms
+                  </label>
+                  <select
+                    value={filters.bedrooms}
+                    onChange={(e) =>
+                      handleFilterChange("bedrooms", e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+                  >
+                    <option value="">Any</option>
+                    <option value="1">1+</option>
+                    <option value="2">2+</option>
+                    <option value="3">3+</option>
+                    <option value="4">4+</option>
+                    <option value="5">5+</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          {/* Properties Grid */}
+          <main className="flex-1">
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-sm md:text-base text-gray-600">
+                {properties.length}{" "}
+                {properties.length === 1 ? "property" : "properties"} found
+              </p>
+              <select className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                <option>Sort: Most Recent</option>
+                <option>Price: Low to High</option>
+                <option>Price: High to Low</option>
+                <option>Most Viewed</option>
+              </select>
+            </div>
+
+            {properties.length === 0 ? (
+              <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+                <div className="text-gray-400 mb-4">
+                  <Filter className="w-16 h-16 mx-auto" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  No properties found
+                </h3>
+                <p className="text-sm md:text-base text-gray-600 mb-4">
+                  Try adjusting your filters to see more results
+                </p>
+                <button
+                  onClick={clearFilters}
+                  className="px-4 md:px-6 py-2 md:py-2.5 text-sm md:text-base bg-teal-700 text-white rounded-lg font-medium hover:bg-teal-800 transition-colors"
+                >
+                  Clear Filters
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {properties.map((property) => (
+                  <PropertyCard key={property.id} property={property} />
+                ))}
+              </div>
+            )}
+          </main>
+        </div>
+      </div>
+
+      {/* Mobile Filters Modal */}
+      {showFilters && (
+        <div 
+          className="fixed inset-0 z-50 md:hidden flex items-end"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+          onClick={() => setShowFilters(false)}
+        >
+          <div 
+            className="w-full bg-white rounded-t-2xl max-h-[75vh] flex flex-col mb-14"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between rounded-t-2xl">
+              <h3 className="text-lg font-bold text-gray-900">Filters</h3>
+              <button
+                onClick={() => setShowFilters(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {/* Same filters as desktop */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Category
+                </label>
+                <select
+                  value={filters.category}
+                  onChange={(e) =>
+                    handleFilterChange("category", e.target.value)
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                >
+                  <option value="">All Categories</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.slug}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Location
+                </label>
+                <select
+                  value={filters.location}
+                  onChange={(e) =>
+                    handleFilterChange("location", e.target.value)
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                >
+                  <option value="">All Locations</option>
+                  {locations.map((loc) => (
+                    <option key={loc} value={loc}>
+                      {loc}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Type
+                </label>
+                <select
+                  value={filters.type}
+                  onChange={(e) => handleFilterChange("type", e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                >
+                  <option value="">All Types</option>
+                  <option value="sale">For Sale</option>
+                  <option value="rent">For Rent</option>
+                  <option value="short-let">Short Let</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Price Range
+                </label>
+                <select
+                  value={filters.priceRange}
+                  onChange={(e) =>
+                    handleFilterChange("priceRange", e.target.value)
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                >
+                  <option value="">All Prices</option>
+                  {priceRanges.map((range) => (
+                    <option key={range.label} value={range.label}>
+                      {range.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Minimum Bedrooms
+                </label>
+                <select
+                  value={filters.bedrooms}
+                  onChange={(e) =>
+                    handleFilterChange("bedrooms", e.target.value)
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                >
+                  <option value="">Any</option>
+                  <option value="1">1+</option>
+                  <option value="2">2+</option>
+                  <option value="3">3+</option>
+                  <option value="4">4+</option>
+                  <option value="5">5+</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex-shrink-0 bg-white border-t border-gray-200 p-4 flex gap-3">
+              <button
+                onClick={clearFilters}
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Clear All
+              </button>
+              <button
+                onClick={() => setShowFilters(false)}
+                className="flex-1 px-4 py-3 bg-teal-700 text-white rounded-lg font-medium hover:bg-teal-800"
+              >
+                Show {properties.length} Results
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
