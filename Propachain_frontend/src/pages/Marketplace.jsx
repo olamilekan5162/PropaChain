@@ -298,12 +298,12 @@ export default function Marketplace() {
 
       {/* Mobile Filters Modal */}
       {showFilters && (
-        <div 
+        <div
           className="fixed inset-0 z-50 md:hidden flex items-end"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
           onClick={() => setShowFilters(false)}
         >
-          <div 
+          <div
             className="w-full bg-white rounded-t-2xl max-h-[75vh] flex flex-col mb-14"
             onClick={(e) => e.stopPropagation()}
           >

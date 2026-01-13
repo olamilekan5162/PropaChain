@@ -285,7 +285,7 @@ export default function MobileHeader({ showSearch = true }) {
       {isMenuOpen && (
         <div
           className="md:hidden fixed inset-0 z-50"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
           onClick={() => setIsMenuOpen(false)}
         >
           <div
